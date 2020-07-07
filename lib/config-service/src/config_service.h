@@ -55,7 +55,19 @@ typedef struct config_service_desc_t {
 class ConfigService
 {
     public:
-        ConfigService(CloudService &cloud_service);
+        /**
+         * @brief Return instance of the config service
+         *
+         * @retval ConfigService&
+         */
+        static ConfigService &instance()
+        {
+            if(!_instance)
+            {
+                _instance = new ConfigService();
+            }
+            return *_instance;
+        }
 
         void init();
 
@@ -66,7 +78,8 @@ class ConfigService
         void resetToFactory();
 
     private:
-        CloudService &cloud_service;
+        ConfigService();
+        static ConfigService *_instance;
 
         std::list<config_service_desc_t> configs;
 

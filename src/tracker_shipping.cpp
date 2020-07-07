@@ -85,5 +85,5 @@ int TrackerShipping::enter_cb(CloudServiceStatus status, JSONValue *root, const 
 
 void TrackerShipping::init()
 {
-    cloud_service.regCommandCallback("enter_shipping", &TrackerShipping::enter_cb, this);
+    CloudService::instance().regCommandCallback("enter_shipping", &TrackerShipping::enter_cb, this);
 }

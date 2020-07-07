@@ -26,50 +26,39 @@
 // on a 0%-100% scale to mark transition betweeen merely OK to GOOD signal
 #define RGB_CONTROL_CELL_STRENGTH_GOOD (70)
 
+TrackerRGB *TrackerRGB::_instance = nullptr;
 static LEDStatus ledStatus(RGB_COLOR_RED, LED_PATTERN_SOLID, LED_SPEED_NORMAL, LED_PRIORITY_CRITICAL);
 static Timer * rgb_control_timer;
 
 static struct {
+    RGBControlType type;
     struct {
-        RGBControlType type;
-        struct {
-            int32_t brightness;
-            int32_t red;
-            int32_t green;
-            int32_t blue;
-        } direct;
-    } config;
-    struct {
-        uint32_t period_ms;
-        bool state;
-        system_tick_t t0;
-    } blink;
-} rgb_control = {
-    .config = {
-        .type = RGBControlType::APP_PARTICLE,
-        .direct = {
-            .brightness = 255,
-            .red = 0,
-            .green = 0,
-            .blue = 255,
-        }
-    },
-    .blink = {
-        .period_ms = 0,
+        int32_t brightness;
+        int32_t red;
+        int32_t green;
+        int32_t blue;
+    } direct;
+} rgb_config = {
+    .type = RGBControlType::APP_PARTICLE,
+    .direct = {
+        .brightness = 255,
+        .red = 0,
+        .green = 0,
+        .blue = 255,
     }
 };
 
 // actual led control driven by a periodic timer
 static void rgb_control_timer_cb()
 {
-    switch(rgb_control.config.type)
+    switch(rgb_config.type)
     {
         case RGBControlType::APP_DIRECT:
         {
-            RGB.brightness(rgb_control.config.direct.brightness);
-            RGB.color(rgb_control.config.direct.red,
-                rgb_control.config.direct.green,
-                rgb_control.config.direct.blue);
+            RGB.brightness(rgb_config.direct.brightness);
+            RGB.color(rgb_config.direct.red,
+                rgb_config.direct.green,
+                rgb_config.direct.blue);
             break;
         }
         case RGBControlType::APP_TRACKER: // fall-thru
@@ -79,7 +68,7 @@ static void rgb_control_timer_cb()
 
             if(TrackerCellular::instance().getSignal(signal))
             {
-                // not connectect to cell
+                // not connected to cell
                 // error or not recent enough signal (which is also error)
                 ledStatus.setPattern(LED_PATTERN_FADE);
                 ledStatus.setPeriod(RGB_CONTROL_FAST_FADE_PERIOD_MS);
@@ -122,7 +111,7 @@ static int rgb_control_set_type_cb(int32_t value, const void *context)
 void TrackerRGB::init()
 {
     rgb_control_timer = new Timer(RGB_CONTROL_TIMER_PERIOD_MS, rgb_control_timer_cb);
-    setType(rgb_control.config.type);
+    setType(rgb_config.type);
 
     static ConfigObject rgb_control_desc("rgb", {
         ConfigStringEnum(
@@ -138,13 +127,15 @@ void TrackerRGB::init()
             rgb_control_set_type_cb
         ),
         ConfigObject("direct", {
-            ConfigInt("brightness", &rgb_control.config.direct.brightness, 0, 255),
-            ConfigInt("red", &rgb_control.config.direct.red, 0, 255),
-            ConfigInt("green", &rgb_control.config.direct.green, 0, 255),
-            ConfigInt("blue", &rgb_control.config.direct.blue, 0, 255),
+            ConfigInt("brightness", &rgb_config.direct.brightness, 0, 255),
+            ConfigInt("red", &rgb_config.direct.red, 0, 255),
+            ConfigInt("green", &rgb_config.direct.green, 0, 255),
+            ConfigInt("blue", &rgb_config.direct.blue, 0, 255),
         })
     });
-    config_service.registerModule(rgb_control_desc);
+    ConfigService::instance().registerModule(rgb_control_desc);
+
+    rgb_control_timer->start();
 }
 
 int TrackerRGB::setType(RGBControlType type)
@@ -153,45 +144,33 @@ int TrackerRGB::setType(RGBControlType type)
     {
         case RGBControlType::APP_PARTICLE:
             ledStatus.setActive(false);
-            if(rgb_control.config.type != RGBControlType::APP_PARTICLE)
+            if(rgb_config.type != RGBControlType::APP_PARTICLE)
             {
-                if(rgb_control_timer->isActive())
-                {
-                    rgb_control_timer->stop();
-                }
-                RGB.control(false);
                 RGB.brightness(255);
+                RGB.control(false);
             }
             break;
         case RGBControlType::APP_OFF:
             ledStatus.setActive(false);
-            if(rgb_control_timer->isActive())
-            {
-                rgb_control_timer->stop();
-            }
             RGB.control(true);
             RGB.brightness(0);
             break;
         case RGBControlType::APP_TRACKER: // fall-thru
         case RGBControlType::APP_GRADIENT: // fall-thru
         case RGBControlType::APP_DIRECT:
+            RGB.brightness(255);
             ledStatus.setActive(type != RGBControlType::APP_DIRECT);
             RGB.control(type == RGBControlType::APP_DIRECT);
-            if(!rgb_control_timer->isActive())
-            {
-                rgb_control_timer->start();
-                rgb_control.blink.period_ms = 0;
-            }
             break;
         default:
             return -EINVAL;
     }
-    rgb_control.config.type = type;
+    rgb_config.type = type;
 
     return 0;
 }
 
 RGBControlType TrackerRGB::getType()
 {
-    return rgb_control.config.type;
+    return rgb_config.type;
 }

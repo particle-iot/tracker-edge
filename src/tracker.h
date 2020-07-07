@@ -28,6 +28,7 @@
 #include "AM1805.h"
 
 #include "tracker_location.h"
+#include "tracker_motion.h"
 #include "tracker_shipping.h"
 #include "tracker_rgb.h"
 #include "gnss_led.h"
@@ -48,19 +49,18 @@ class Tracker
         uint32_t getVariant() {return _variant;}
 
         // underlying services exposed to allow sharing with rest of the system
-        CloudService cloudService;
-        ConfigService configService;
-        LocationService locationService;
-        MotionService motionService;
+        CloudService &cloudService;
+        ConfigService &configService;
+        LocationService &locationService;
+        MotionService &motionService;
 
         AM1805 rtc;
 
-        TrackerLocation location;
+        TrackerLocation &location;
+        TrackerMotion &motion;
         TrackerShipping shipping;
-        TrackerRGB rgb;
+        TrackerRGB &rgb;
     private:
-        BackgroundPublish background_publish;
-
         uint32_t _model;
         uint32_t _variant;
 

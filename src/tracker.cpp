@@ -20,12 +20,15 @@
 #include "tracker_cellular.h"
 
 Tracker::Tracker() :
-    cloudService(background_publish),
-    configService(cloudService),
+    cloudService(CloudService::instance()),
+    configService(ConfigService::instance()),
+    locationService(LocationService::instance()),
+    motionService(MotionService::instance()),
     rtc(AM1805_PIN_INVALID, RTC_AM1805_I2C_INSTANCE, RTC_AM1805_I2C_ADDR),
-    location(configService, cloudService, locationService, motionService),
-    shipping(cloudService),
-    rgb(configService)
+    location(TrackerLocation::instance()),
+    motion(TrackerMotion::instance()),
+    shipping(),
+    rgb(TrackerRGB::instance())
 {
 }
 
@@ -54,13 +57,11 @@ void Tracker::init()
     // PIN_INVALID to disable unnecessary config of a default CS pin
     SPI.begin(PIN_INVALID);
 
-    background_publish.start();
+    CloudService::instance().init();
 
-    cloudService.init();
+    ConfigService::instance().init();
 
-    configService.init();
-
-    ret = locationService.begin(UBLOX_SPI_INTERFACE,
+    ret = LocationService::instance().begin(UBLOX_SPI_INTERFACE,
         UBLOX_CS_PIN,
         UBLOX_PWR_EN_PIN,
         UBLOX_TX_READY_MCU_PIN,
@@ -70,15 +71,17 @@ void Tracker::init()
         Log.error("Failed to begin location service");
     }
 
-    locationService.start();
+    LocationService::instance().start();
 
 #ifdef TRACKER_GNSS_LOCK_LED
-    (void)GnssLedInit(locationService);
+    (void)GnssLedInit();
 #endif // TRACKER_GNSS_LOCK_LED
 
-    motionService.start();
+    MotionService::instance().start();
 
     location.init();
+
+    motion.init();
 
     shipping.init();
     shipping.regShutdownCallback(std::bind(&Tracker::stop, this));
@@ -94,7 +97,7 @@ void Tracker::init()
 #endif
 
 #ifdef TRACKER_THERMISTOR
-    temperature_init(&configService, TRACKER_THERMISTOR);
+    temperature_init(TRACKER_THERMISTOR);
 #endif // TRACKER_THERMISTOR
 
     location.regLocGenCallback(loc_gen_cb);
@@ -115,21 +118,41 @@ void Tracker::loop()
     }
 
     // fast operations for every loop
-    cloudService.tick();
-    configService.tick();
+    CloudService::instance().tick();
+    ConfigService::instance().tick();
+#ifdef TRACKER_THERMISTOR
+    temperature_tick();
+
+    if (temperature_high_events())
+    {
+        location.triggerLocPub(Trigger::NORMAL,"temp_h");
+    }
+
+    if (temperature_low_events())
+    {
+        location.triggerLocPub(Trigger::NORMAL,"temp_l");
+    }
+#endif // TRACKER_THERMISTOR
     location.loop();
 }
 
 int Tracker::stop()
 {
-    locationService.stop();
-    motionService.stop();
+    LocationService::instance().stop();
+    MotionService::instance().stop();
 
     return 0;
 }
 
 void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context)
 {
+
+    if(TrackerLocation::instance().getMinPublish())
+    {
+        // only add additional fields when not on minimal publish
+        return;
+    }
+
     // add cellular signal strength if available
     CellularSignal signal;
     if(!TrackerCellular::instance().getSignal(signal))
@@ -150,4 +173,8 @@ void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *con
             writer.name("batt").value(bat, 1);
         }
     }
+
+    #ifdef TRACKER_THERMISTOR
+        writer.name("temp").value(get_temperature(), 1);
+    #endif // TRACKER_THERMISTOR
 }

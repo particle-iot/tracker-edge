@@ -22,8 +22,9 @@
 
 #include <string.h>
 
-CloudService::CloudService(BackgroundPublish &background_publish) :
-    background_publish(background_publish),
+CloudService *CloudService::_instance = nullptr;
+
+CloudService::CloudService() :
     _writer(json_buf, sizeof(json_buf)), _req_id(1)
 {
 }
@@ -31,6 +32,7 @@ CloudService::CloudService(BackgroundPublish &background_publish) :
 void CloudService::init()
 {
     Particle.function("cmd", &CloudService::command_dispatcher, this);
+    background_publish.start();
 }
 
 void CloudService::tick()

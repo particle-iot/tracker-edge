@@ -16,32 +16,26 @@
 
 #pragma once
 
-#include "config_service.h"
-
-enum class RGBControlType {
-    APP_PARTICLE, // standard particle device-os control
-    APP_OFF, // force LED off
-    APP_TRACKER, // display cell/cloud connection and signal strength customized for tracker
-    APP_GRADIENT, // with added gradient
-    APP_DIRECT, // direct control of LED (rgb and brightness)
-};
-
-class TrackerRGB
+class TrackerMotion
 {
     public:
-        static TrackerRGB &instance()
+        /**
+         * @brief Return instance of the tracker motion object
+         *
+         * @retval CloudService&
+         */
+        static TrackerMotion &instance()
         {
             if(!_instance)
             {
-                _instance = new TrackerRGB();
+                _instance = new TrackerMotion();
             }
             return *_instance;
         }
 
         void init();
-        static int setType(RGBControlType type);
-        static RGBControlType getType();
+        void loop();
     private:
-        TrackerRGB() {}
-        static TrackerRGB *_instance;
+        TrackerMotion() {}
+        static TrackerMotion *_instance;
 };

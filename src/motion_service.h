@@ -82,9 +82,19 @@ public:
     static constexpr system_tick_t MOTION_TIMEOUT_DEFAULT = 5*60*1000;
     static constexpr system_tick_t MOTION_EVENTS_DEFAULT = 10;
 
-
-    MotionService();
-    ~MotionService();
+    /**
+     * @brief Return instance of the motion service
+     *
+     * @retval MotionService&
+     */
+    static MotionService &instance()
+    {
+        if(!_instance)
+        {
+            _instance = new MotionService();
+        }
+        return *_instance;
+    }
 
     /**
      * @brief Start the motion service
@@ -188,6 +198,9 @@ public:
     size_t getQueueDepth();
 
 private:
+
+    MotionService();
+    static MotionService *_instance;
 
     /**
      * @brief MotionService main thread to receive, process, and send events

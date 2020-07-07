@@ -29,15 +29,13 @@ namespace {
 
 } // anonymous namespace
 
+LocationService *LocationService::_instance = nullptr;
+
 LocationService::LocationService()
     : gps_(nullptr),
       pointThreshold_({0}),
       pointThresholdConfigured_(false) {
 
-}
-
-LocationService::~LocationService() {
-    cleanup();
 }
 
 int LocationService::begin(SPIClass& spi, uint16_t chipSelectPin, uint16_t powerEnablePin, uint16_t txReadyMCUPin, uint16_t txReadyGPSPin) {

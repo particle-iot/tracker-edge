@@ -77,9 +77,19 @@ public:
     static constexpr system_tick_t LOCATION_STARTUP_PERIOD_DEFAULT = 1*1000; // One second
     static constexpr system_tick_t LOCATION_LOCK_PERIOD_DEFAULT = 1*1000; // One second
 
-
-    LocationService();
-    ~LocationService();
+    /**
+     * @brief Return instance of the LocationService
+     *
+     * @retval LocationService&
+     */
+    static LocationService &instance()
+    {
+        if(!_instance)
+        {
+            _instance = new LocationService();
+        }
+        return *_instance;
+    }
 
     /**
      * @brief Initialize the location service
@@ -185,6 +195,9 @@ public:
     int getStatus(LocationStatus& status);
 
 private:
+
+    LocationService();
+    static LocationService *_instance;
 
     void cleanup();
 

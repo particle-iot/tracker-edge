@@ -31,36 +31,26 @@ struct tracker_location_config_t {
     bool min_publish;
 };
 
-enum PendingEvent : uint32_t {
-    EVENT_TIME                  = (1UL << 0),
-    EVENT_RADIUS                = (1UL << 1),
-    EVENT_IMU_M                 = (1UL << 2),
-    EVENT_IMU_G                 = (1UL << 3),
-    EVENT_TEMP_H                = (1UL << 4),
-    EVENT_TEMP_L                = (1UL << 5),
-    EVENT_LOCK                  = (1UL << 6),
-    EVENT_USER                  = (1UL << 7),
-    // special flag to indicate events should disregard standard interval
-    // filtering
-    EVENT_IMMEDIATE             = (1UL << 31),
+enum class Trigger {
+    NORMAL = 0,
+    IMMEDIATE = 1,
 };
 
 class TrackerLocation
 {
     public:
-        TrackerLocation(ConfigService &config, CloudService &cloud, LocationService &location, MotionService &motion) :
-            config_service(config),
-            cloud_service(cloud),
-            location_service(location),
-            motion_service(motion),
-            pending_events(0),
-            location_publish_retry_str(nullptr)
+        /**
+         * @brief Return instance of the tracker location object
+         *
+         * @retval CloudService&
+         */
+        static TrackerLocation &instance()
         {
-            config_state = {
-                .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
-                .interval_max_seconds = TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC,
-                .min_publish = TRACKER_LOCATION_MIN_PUBLISH_DEFAULT
-            };
+            if(!_instance)
+            {
+                _instance = new TrackerLocation();
+            }
+            return *_instance;
         }
 
         void init();
@@ -91,20 +81,36 @@ class TrackerLocation
             T *instance,
             const void *context=nullptr);
 
-        int triggerLocPub(bool immediate = false);
+        int triggerLocPub(Trigger type = Trigger::NORMAL, const char *s = "user");
+
+        void lock() {mutex.lock();}
+        void unlock() {mutex.unlock();}
+
+        inline bool getMinPublish() { return config_state.min_publish; }
 
     private:
-        ConfigService &config_service;
-        CloudService &cloud_service;
-        LocationService &location_service;
-        MotionService &motion_service;
+        TrackerLocation() :
+            location_publish_retry_str(nullptr)
+        {
+            config_state = {
+                .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
+                .interval_max_seconds = TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC,
+                .min_publish = TRACKER_LOCATION_MIN_PUBLISH_DEFAULT
+            };
+        }
+        static TrackerLocation *_instance;
 
-        std::atomic<uint32_t> pending_events;
+        std::recursive_mutex mutex;
+
+        Vector<const char *> pending_triggers;
+        bool pending_immediate;
 
         char *location_publish_retry_str;
 
         int enter_location_config_cb(bool write, const void *context);
         int exit_location_config_cb(bool write, int status, const void *context);
+
+        int get_loc_cb(CloudServiceStatus status, JSONValue *root, const void *context);
 
         int location_publish_cb(CloudServiceStatus status, JSONValue *, const char *req_event, const void *context);
 

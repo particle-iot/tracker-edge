@@ -81,7 +81,19 @@ typedef struct cloud_service_send_handler_t {
 class CloudService
 {
     public:
-        CloudService(BackgroundPublish &background_publish);
+        /**
+         * @brief Return instance of the cloud service
+         *
+         * @retval CloudService&
+         */
+        static CloudService &instance()
+        {
+            if(!_instance)
+            {
+                _instance = new CloudService();
+            }
+            return *_instance;
+        }
 
         void init();
 
@@ -143,7 +155,10 @@ class CloudService
             uint32_t timeout_ms=0,
             const void *context=nullptr);
     private:
-        BackgroundPublish &background_publish;
+        CloudService();
+        static CloudService *_instance;
+
+        BackgroundPublish background_publish;
 
         // internal callback for non-blocking publish on the send path
         void publish_cb(

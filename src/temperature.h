@@ -53,13 +53,12 @@ size_t temperature_low_events();
 /**
  * @brief Initialize the temperature sampling feature.
  *
- * @param [in]  configService Configuration service object to publish.
  * @param [in]  analogPin     Analog pin to use for thermistor sampling.
  *
  * @retval SYSTEM_ERROR_NONE
  * @retval SYSTEM_ERROR_INVALID_ARGUMENT
  */
-int temperature_init(ConfigService* configService, pin_t analogPin);
+int temperature_init(pin_t analogPin);
 
 /**
  * @brief Process the temperature loop tick.

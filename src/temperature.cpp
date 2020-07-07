@@ -75,15 +75,12 @@ enum class TempState {
 
 
 static Thermistor _thermistor;
-static ConfigService* _configService = nullptr;
 
 float get_temperature() {
   return _thermistor.getTemperature();
 }
 
-int temperature_init(ConfigService* configService, pin_t analogPin) {
-  CHECK_TRUE(configService, SYSTEM_ERROR_INVALID_ARGUMENT);
-
+int temperature_init(pin_t analogPin) {  
   CHECK(_thermistor.begin(analogPin, _thermistorConfig));
 
   static ConfigObject _serviceObject
@@ -100,9 +97,7 @@ int temperature_init(ConfigService* configService, pin_t analogPin) {
       }
   );
 
-  CHECK(configService->registerModule(_serviceObject));
-
-  _configService = configService;
+  CHECK(ConfigService::instance().registerModule(_serviceObject));
 
   return SYSTEM_ERROR_NONE;
 }

@@ -73,16 +73,14 @@ enum MotionAwakeFlags : uint32_t {
 
 } // anonymous namespace
 
+MotionService *MotionService::_instance = nullptr;
+
 MotionService::MotionService()
     : thread_(nullptr),
       counters_({0}),
       motionEventQueue_(nullptr),
       awakeFlags_(0),
       eventDepth_(0) {
-
-}
-
-MotionService::~MotionService() {
 
 }
 
