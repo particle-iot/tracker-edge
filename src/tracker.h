@@ -39,7 +39,14 @@
 class Tracker
 {
     public:
-        Tracker();
+        static Tracker &instance()
+        {
+            if(!_instance)
+            {
+                _instance = new Tracker();
+            }
+            return *_instance;
+        }
 
         void init();
         void loop();
@@ -61,6 +68,10 @@ class Tracker
         TrackerShipping shipping;
         TrackerRGB &rgb;
     private:
+        Tracker();
+
+        static Tracker* _instance;
+
         uint32_t _model;
         uint32_t _variant;
 

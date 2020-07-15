@@ -19,6 +19,8 @@
 #include "tracker.h"
 #include "tracker_cellular.h"
 
+Tracker *Tracker::_instance = nullptr;
+
 Tracker::Tracker() :
     cloudService(CloudService::instance()),
     configService(ConfigService::instance()),
