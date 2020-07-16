@@ -66,20 +66,11 @@
 #define UBLOX_TX_READY_MCU_PIN                (GPS_INT)
 #define UBLOX_TX_READY_GPS_PIN                (14) // PIO 14 is EXTINT on GPS Module
 
-
-#if TRACKER_MODEL_NUMBER == TRACKER_MODEL_TRACKERONE
-#define TRACKER_THERMISTOR                    (A0)
-#endif // TRACKER_MODEL_NUMBER
-
-#if TRACKER_MODEL_NUMBER == TRACKER_MODEL_TRACKERONE
-#define TRACKER_USER_BUTTON                   (A1)
-#endif // TRACKER_MODEL_NUMBER
-
-#if TRACKER_MODEL_NUMBER == TRACKER_MODEL_TRACKERONE
-#define TRACKER_GNSS_LOCK_LED                 (A2)
-#endif // TRACKER_MODEL_NUMBER
-
 #define RTC_AM1805_I2C_INSTANCE               (Wire1)
 #define RTC_AM1805_I2C_ADDR                   (HAL_PLATFORM_EXTERNAL_RTC_I2C_ADDR)
+
+#define TRACKER_THERMISTOR                    (A0)
+#define TRACKER_USER_BUTTON                   (D1)
+#define TRACKER_GNSS_LOCK_LED                 (D2)
 
 #define RTC_WDT_DISABLE

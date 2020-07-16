@@ -112,9 +112,12 @@ void Tracker::init()
 
     LocationService::instance().start();
 
-#ifdef TRACKER_GNSS_LOCK_LED
-    (void)GnssLedInit();
-#endif // TRACKER_GNSS_LOCK_LED
+    // Check for Tracker One hardware
+    if (_model == TRACKER_MODEL_TRACKERONE)
+    {
+        (void)GnssLedInit();
+        temperature_init(TRACKER_THERMISTOR);
+    }
 
     MotionService::instance().start();
 
@@ -134,10 +137,6 @@ void Tracker::init()
     // watchdog at 1 minute
     rtc.configure_wdt(true, 15, AM1805_WDT_REGISTER_WRB_QUARTER_HZ);
 #endif
-
-#ifdef TRACKER_THERMISTOR
-    temperature_init(TRACKER_THERMISTOR);
-#endif // TRACKER_THERMISTOR
 
     location.regLocGenCallback(loc_gen_cb);
 }
@@ -159,19 +158,23 @@ void Tracker::loop()
     // fast operations for every loop
     CloudService::instance().tick();
     ConfigService::instance().tick();
-#ifdef TRACKER_THERMISTOR
-    temperature_tick();
 
-    if (temperature_high_events())
+    // Check for Tracker One hardware
+    if (_model == TRACKER_MODEL_TRACKERONE)
     {
-        location.triggerLocPub(Trigger::NORMAL,"temp_h");
+        temperature_tick();
+
+        if (temperature_high_events())
+        {
+            location.triggerLocPub(Trigger::NORMAL,"temp_h");
+        }
+
+        if (temperature_low_events())
+        {
+            location.triggerLocPub(Trigger::NORMAL,"temp_l");
+        }
     }
 
-    if (temperature_low_events())
-    {
-        location.triggerLocPub(Trigger::NORMAL,"temp_l");
-    }
-#endif // TRACKER_THERMISTOR
     location.loop();
 }
 
@@ -213,7 +216,9 @@ void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *con
         }
     }
 
-    #ifdef TRACKER_THERMISTOR
+    // Check for Tracker One hardware
+    if (Tracker::instance().getModel() == TRACKER_MODEL_TRACKERONE)
+    {
         writer.name("temp").value(get_temperature(), 1);
-    #endif // TRACKER_THERMISTOR
+    }
 }
