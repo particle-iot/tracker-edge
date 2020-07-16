@@ -31,7 +31,7 @@ CloudService::CloudService() :
 
 void CloudService::init()
 {
-    Particle.function("cmd", &CloudService::command_dispatcher, this);
+    Particle.function("cmd", &CloudService::dispatchCommand, this);
     background_publish.start();
 }
 
@@ -182,7 +182,7 @@ static int _get_common_fields(JSONValue &root, const char **cmd, const char **sr
     return rval;
 }
 
-int CloudService::command_dispatcher(String data)
+int CloudService::dispatchCommand(String data)
 {
     Log.info("cloud received: %s", data.c_str());
     JSONValue root = JSONValue::parseCopy(data, data.length());

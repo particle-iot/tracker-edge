@@ -145,6 +145,9 @@ class CloudService
         void lock() {mutex.lock();}
         void unlock() {mutex.unlock();}
 
+        // process and dispatch incoming commands to registered callbacks
+        int dispatchCommand(String cmd);
+
         int regCommandCallback(const char *name, cloud_service_cb_t cb, uint32_t req_id=0, uint32_t timeout_ms=0, const void *context=nullptr);
 
         template <typename T>
@@ -171,9 +174,6 @@ class CloudService
         static int send_cb_wrapper(CloudServiceStatus status,
             JSONValue *rsp_root,
             const void *context);
-
-        // process and dispatch incoming commands to registered callbacks
-        int command_dispatcher(String cmd);
 
         // process infrequent actions
         void tick_sec();

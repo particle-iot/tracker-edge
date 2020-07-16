@@ -34,6 +34,11 @@
 #include "gnss_led.h"
 #include "temperature.h"
 
+struct TrackerConfig
+{
+    bool UsbCommandEnable;
+};
+
 // this class encapsulates the underlying modules and builds on top of them to
 // provide a cohesive asset tracking application
 class Tracker
@@ -55,6 +60,8 @@ class Tracker
         uint32_t getModel() {return _model;}
         uint32_t getVariant() {return _variant;}
 
+        bool isUsbCommandEnabled() { return _config.UsbCommandEnable; }
+
         // underlying services exposed to allow sharing with rest of the system
         CloudService &cloudService;
         ConfigService &configService;
@@ -71,11 +78,13 @@ class Tracker
         Tracker();
 
         static Tracker* _instance;
+        TrackerConfig _config;
 
         uint32_t _model;
         uint32_t _variant;
 
         uint32_t last_loop_sec;
 
+        int registerConfig();
         static void loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context);
 };

@@ -19,6 +19,26 @@
 #include "tracker.h"
 #include "tracker_cellular.h"
 
+
+void ctrl_request_custom_handler(ctrl_request* req)
+{
+    auto result = SYSTEM_ERROR_NOT_SUPPORTED;
+    if (Tracker::instance().isUsbCommandEnabled())
+    {
+        String command(req->request_data, req->request_size);
+        if (CloudService::instance().dispatchCommand(command))
+        {
+            result = SYSTEM_ERROR_NONE;
+        }
+        else
+        {
+            result = SYSTEM_ERROR_INVALID_ARGUMENT;
+        }
+    }
+  
+    system_ctrl_set_result(req, result, nullptr, nullptr, nullptr);
+}
+
 Tracker *Tracker::_instance = nullptr;
 
 Tracker::Tracker() :
@@ -32,6 +52,20 @@ Tracker::Tracker() :
     shipping(),
     rgb(TrackerRGB::instance())
 {
+    _config =
+    {
+        .UsbCommandEnable = true,
+    };
+}
+
+int Tracker::registerConfig()
+{
+    static ConfigObject tracker_config("tracker", {
+        ConfigBool("usb_cmd", &_config.UsbCommandEnable),
+    });
+    ConfigService::instance().registerModule(tracker_config);
+
+    return 0;
 }
 
 void Tracker::init()
@@ -62,6 +96,9 @@ void Tracker::init()
     CloudService::instance().init();
 
     ConfigService::instance().init();
+
+    // Register our own configuration settings
+    registerConfig();
 
     ret = LocationService::instance().begin(UBLOX_SPI_INTERFACE,
         UBLOX_CS_PIN,
