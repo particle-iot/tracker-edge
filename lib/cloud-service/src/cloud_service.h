@@ -54,7 +54,9 @@ typedef std::function<int(CloudServiceStatus status, JSONValue *, const void *co
 
 typedef std::function<int(CloudServiceStatus status, JSONValue *, const char *, const void *context)> cloud_service_send_cb_t;
 
-typedef struct cloud_service_handler_t {
+class cloud_service_handler_t
+{
+public:
     CloudServicePublishFlags cloud_flags;
     cloud_service_cb_t cb;
     // match on this cmd (or blank for don't care)
@@ -66,14 +68,16 @@ typedef struct cloud_service_handler_t {
     const void *context;
     uint32_t t0;
     CloudServiceStatus status;
-} cloud_service_handler_t;
+};
 
-typedef struct cloud_service_send_handler_t {
+class cloud_service_send_handler_t
+{
+public:
     cloud_service_handler_t base_handler;
     cloud_service_send_cb_t cb;
     const void *context;
-    char req_data[];
-} cloud_service_send_handler_t;
+    String req_data;
+};
 
 class CloudService
 {
