@@ -18,8 +18,6 @@
 #include "gnss_led.h"
 #include "tracker_config.h"
 
-#ifdef TRACKER_GNSS_LOCK_LED
-
 static void GnssLedTimer();
 
 static Timer* timer_ = nullptr;
@@ -76,5 +74,3 @@ int GnssLedInit() {
 
     return SYSTEM_ERROR_NONE;
 }
-
-#endif // TRACKER_GNSS_LOCK_LED
