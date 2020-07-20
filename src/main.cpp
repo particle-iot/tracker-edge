@@ -32,16 +32,14 @@ SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
     { "net.ppp.client", LOG_LEVEL_INFO },
 });
 
-Tracker tracker;
-
 void setup()
 {
-    tracker.init();
+    Tracker::instance().init();
 
     Particle.connect();
 }
 
 void loop()
 {
-    tracker.loop();
+     Tracker::instance().loop();
 }

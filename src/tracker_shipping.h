@@ -23,10 +23,7 @@ typedef std::function<int(void)> shipping_mode_shutdown_cb_t;
 class TrackerShipping
 {
     public:
-        TrackerShipping(CloudService &cloud_service) :
-            cloud_service(cloud_service),
-            shutdown_cb(nullptr)
-        {}
+        TrackerShipping() : shutdown_cb(nullptr) {}
         
         void init();
 
@@ -34,7 +31,6 @@ class TrackerShipping
 
         int regShutdownCallback(shipping_mode_shutdown_cb_t cb);
     private:
-        CloudService &cloud_service;
         shipping_mode_shutdown_cb_t shutdown_cb;
 
         int enter_cb(CloudServiceStatus status, JSONValue *root, const void *context);

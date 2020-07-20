@@ -154,8 +154,8 @@ int ConfigStringEnum::get(const char * &value)
     return -EINVAL;
 }
 
-ConfigService::ConfigService(CloudService &cloud_service) :
-    cloud_service(cloud_service),
+ConfigService *ConfigService::_instance = nullptr;
+ConfigService::ConfigService() :
     fs_ok(false),
     sync_pending(false),
     sync_ok(false),
@@ -165,9 +165,9 @@ ConfigService::ConfigService(CloudService &cloud_service) :
 
 void ConfigService::init()
 {
-    cloud_service.regCommandCallback("set_cfg", &ConfigService::set_cfg_cb, this);
-    cloud_service.regCommandCallback("get_cfg", &ConfigService::get_cfg_cb, this);
-    cloud_service.regCommandCallback("reset_to_factory", &ConfigService::reset_to_factory_cb, this);
+    CloudService::instance().regCommandCallback("set_cfg", &ConfigService::set_cfg_cb, this);
+    CloudService::instance().regCommandCallback("get_cfg", &ConfigService::get_cfg_cb, this);
+    CloudService::instance().regCommandCallback("reset_to_factory", &ConfigService::reset_to_factory_cb, this);
     
     struct stat st;
 
@@ -212,6 +212,7 @@ void ConfigService::tick_sec()
 
     if(Particle.connected())
     {
+        CloudService &cloud_service = CloudService::instance();
         if(!sync_ok)
         {
             if(!sync_pending)
@@ -583,7 +584,7 @@ int ConfigService::get_cfg_cb(CloudServiceStatus status, JSONValue *root, const 
     }
 
     // TODO: handle error/retry/callback
-    cloud_service.sendAck(*root, rval);
+    CloudService::instance().sendAck(*root, rval);
     
     return rval;
 }
@@ -650,7 +651,7 @@ int ConfigService::set_cfg_cb(CloudServiceStatus status, JSONValue *root, const 
     }
 
     // TODO: handle error/retry/callback?
-    cloud_service.sendAck(*root, rval);
+    CloudService::instance().sendAck(*root, rval);
 
     return rval;
 }
@@ -659,7 +660,7 @@ int ConfigService::reset_to_factory_cb(CloudServiceStatus status, JSONValue *roo
 {
     resetToFactory();
 
-    cloud_service.sendAck(*root, 0);
+    CloudService::instance().sendAck(*root, 0);
 
     return 0;
 }

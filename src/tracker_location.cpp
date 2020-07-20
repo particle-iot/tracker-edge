@@ -22,8 +22,8 @@
 
 #include "config_service.h"
 #include "location_service.h"
-#include "motion_service.h"
-#include "temperature.h"
+
+TrackerLocation *TrackerLocation::_instance = nullptr;
 
 static constexpr system_tick_t sample_rate = 1000; // milliseconds
 
@@ -41,46 +41,6 @@ static int get_radius_cb(double &value, const void *context)
     static_cast<LocationService *>((void *)context)->getRadiusThreshold(temp);
 
     value = temp;
-
-    return 0;
-}
-
-static int get_motion_enabled_cb(int32_t &value, const void *context)
-{
-    value = (int32_t) static_cast<MotionService *>((void *)context)->getMotionDetection();
-    return 0;
-}
-
-static int set_motion_enabled_cb(int32_t value, const void *context)
-{
-    // TODO: What do we do if this fails to the underlying IMU?
-    // Should we keep retrying at this layer somehow? Return a failure?
-    static_cast<MotionService *>((void *)context)->enableMotionDetection((MotionDetectionMode) value);
-    return 0;
-}
-
-static int get_high_g_enabled_cb(int32_t &value, const void *context)
-{
-    value = (int32_t) static_cast<MotionService *>((void *)context)->getHighGDetection();
-    return 0;
-}
-
-static int set_high_g_enabled_cb(int32_t value, const void *context)
-{
-    MotionService *motion_service = static_cast<MotionService *>((void *)context);
-
-    if(value == (int32_t) HighGDetectionMode::DISABLE)
-    {
-        motion_service->disableHighGDetection();
-    }
-    else if(value == (int32_t) HighGDetectionMode::ENABLE)
-    {
-        motion_service->enableHighGDetection();
-    }
-    else
-    {
-        return -EINVAL;
-    }
 
     return 0;
 }
@@ -111,13 +71,21 @@ int TrackerLocation::exit_location_config_cb(bool write, int status, const void 
     return status;
 }
 
+int TrackerLocation::get_loc_cb(CloudServiceStatus status,
+    JSONValue *root,
+    const void *context)
+{
+   triggerLocPub(Trigger::IMMEDIATE);
+   return 0;
+}
+
 void TrackerLocation::init()
 {
     static ConfigObject location_desc
     (
         "location",
         {
-            ConfigFloat("radius", get_radius_cb, set_radius_cb, &location_service).min(0.0).max(1000000.0),
+            ConfigFloat("radius", get_radius_cb, set_radius_cb, &LocationService::instance()).min(0.0).max(1000000.0),
             ConfigInt("interval_min", config_get_int32_cb, config_set_int32_cb,
                 &config_state.interval_min_seconds, &config_state_shadow.interval_min_seconds,
                 0, 86400l),
@@ -132,37 +100,9 @@ void TrackerLocation::init()
         std::bind(&TrackerLocation::exit_location_config_cb, this, _1, _2, _3)
     );
 
-    static ConfigObject imu_desc
-    (
-        "imu_trig",
-        {
-            ConfigStringEnum(
-                "motion",
-                {
-                    {"disable", (int32_t) MotionDetectionMode::NONE},
-                    {"low", (int32_t) MotionDetectionMode::LOW_SENSITIVITY},
-                    {"medium", (int32_t) MotionDetectionMode::MEDIUM_SENSITIVITY},
-                    {"high", (int32_t) MotionDetectionMode::HIGH_SENSITIVITY},
-                },
-                get_motion_enabled_cb,
-                set_motion_enabled_cb,
-                &motion_service
-            ),
-            ConfigStringEnum(
-                "high_g",
-                {
-                    {"disable", (int32_t) HighGDetectionMode::DISABLE},
-                    {"enable", (int32_t) HighGDetectionMode::ENABLE},
-                },
-                get_high_g_enabled_cb,
-                set_high_g_enabled_cb,
-                &motion_service
-            ),
-        }
-    );
+    ConfigService::instance().registerModule(location_desc);
 
-    config_service.registerModule(location_desc);
-    config_service.registerModule(imu_desc);
+    CloudService::instance().regCommandCallback("get_loc", &TrackerLocation::get_loc_cb, this);
 
     last_location_publish_sec = System.uptime() - config_state.interval_min_seconds;
 }
@@ -185,15 +125,30 @@ int TrackerLocation::regLocPubCallback(
     return 0;
 }
 
-int TrackerLocation::triggerLocPub(bool immediate)
+int TrackerLocation::triggerLocPub(Trigger type, const char *s)
 {
-    PendingEvent event = PendingEvent::EVENT_USER;
+    std::lock_guard<std::recursive_mutex> lg(mutex);
+    bool matched = false;
 
-    if(immediate)
+    for(auto trigger : pending_triggers)
     {
-        event = (PendingEvent) (event | PendingEvent::EVENT_IMMEDIATE);
+        if(!strcmp(trigger, s))
+        {
+            matched = true;
+            break;
+        }
     }
-    pending_events.fetch_or(event);
+    
+    if(!matched)
+    {
+        pending_triggers.append(s);
+    }
+
+    if(type == Trigger::IMMEDIATE)
+    {
+        pending_immediate = true;
+    }
+
     return 0;
 }
 
@@ -256,6 +211,7 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
 void TrackerLocation::location_publish()
 {
     int rval;
+    CloudService &cloud_service = CloudService::instance();
 
     // maintain cloud service lock across the send to allow us to save off
     // the finalized loc publish to retry on failure
@@ -332,42 +288,9 @@ void TrackerLocation::loop()
     {
         return;
     }
-
     last_sample = millis();
 
-
-    MotionEvent motion_event;
-    size_t depth = motion_service.getQueueDepth();
-
-    do {
-        motion_service.waitOnEvent(motion_event, 0);
-        switch (motion_event.source)
-        {
-            case MotionSource::MOTION_HIGH_G:
-                pending_events.fetch_or(PendingEvent::EVENT_IMU_G);
-                break;
-
-            case MotionSource::MOTION_MOVEMENT:
-                pending_events.fetch_or(PendingEvent::EVENT_IMU_M);
-                break;
-        }
-    } while (--depth && (motion_event.source != MotionSource::MOTION_NONE));
-
-#ifdef TRACKER_THERMISTOR
-    temperature_tick();
-
-    if (temperature_high_events())
-    {
-        pending_events.fetch_or(PendingEvent::EVENT_TEMP_H);
-    }
-
-    if (temperature_low_events())
-    {
-        pending_events.fetch_or(PendingEvent::EVENT_TEMP_L);
-    }
-#endif // TRACKER_THERMISTOR
-
-    if(location_service.getLocation(cur_loc) != SYSTEM_ERROR_NONE)
+    if(LocationService::instance().getLocation(cur_loc) != SYSTEM_ERROR_NONE)
     {
         return;
     }
@@ -375,40 +298,41 @@ void TrackerLocation::loop()
     float radius;
     bool outside;
 
-    if(location_service.getRadiusThreshold(radius) == SYSTEM_ERROR_NONE &&
+    if(cur_loc.locked &&
+        LocationService::instance().getRadiusThreshold(radius) == SYSTEM_ERROR_NONE &&
         radius &&
-        location_service.isOutsideRadius(outside, cur_loc) == SYSTEM_ERROR_NONE &&
+        LocationService::instance().isOutsideRadius(outside, cur_loc) == SYSTEM_ERROR_NONE &&
         outside)
     {
-        pending_events.fetch_or(PendingEvent::EVENT_RADIUS);
+        triggerLocPub(Trigger::NORMAL,"radius");
     }
 
     if(cur_loc.locked != last_loc_locked_pub)
     {
-        pending_events.fetch_or(PendingEvent::EVENT_LOCK);
+        triggerLocPub(Trigger::NORMAL,"lock");
     }
 
     //
     // Perform interval evaluation
     //
     bool pub_requested = false;
-    bool immediate = pending_events.fetch_and(~PendingEvent::EVENT_IMMEDIATE) & PendingEvent::EVENT_IMMEDIATE;
-    if(immediate)
+    if(pending_immediate)
     {
         // request for immediate publish overrides the default min/max interval checking
         pub_requested = true;
+        pending_immediate = false;
     }
     else if(config_state.interval_max_seconds && System.uptime() - last_location_publish_sec >= (uint32_t) config_state.interval_max_seconds)
     {
         // max interval and past the max interval so have to publish
-        pending_events.fetch_or(PendingEvent::EVENT_TIME);
+        triggerLocPub(Trigger::NORMAL,"time");
         pub_requested = true;
     }
     else if(!config_state.interval_min_seconds || System.uptime() - last_location_publish_sec >= (uint32_t) config_state.interval_min_seconds)
     {
         // no min interval or past the min interval so can publish
         // check radius and imu triggers
-        if (pending_events.load())
+        if (pending_triggers.size())
         {
             pub_requested = true;
         }
@@ -436,52 +360,14 @@ void TrackerLocation::loop()
             location_publish_retry_str = nullptr;
         }
 
-        Vector<String> events;
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_TIME) & PendingEvent::EVENT_TIME)
-        {
-            events.append("time");
-        }
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_RADIUS) & PendingEvent::EVENT_RADIUS)
-        {
-            events.append("radius");
-        }
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_IMU_G) & PendingEvent::EVENT_IMU_G)
-        {
-            events.append("imu_g");
-        }
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_IMU_M) & PendingEvent::EVENT_IMU_M)
-        {
-            events.append("imu_m");
-        }
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_TEMP_H) & PendingEvent::EVENT_TEMP_H)
-        {
-            events.append("temp_h");
-        }
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_TEMP_L) & PendingEvent::EVENT_TEMP_L)
-        {
-            events.append("temp_l");
-        }
-
-        if (pending_events.fetch_and(~PendingEvent::EVENT_USER) & PendingEvent::EVENT_USER)
-        {
-            events.append("user");
-        }
-
-        if(pending_events.fetch_and(~PendingEvent::EVENT_LOCK) & PendingEvent::EVENT_LOCK)
-        {
-            events.append("lock");
-        }
-
         last_location_publish_sec = System.uptime();
         last_loc_locked_pub = cur_loc.locked;
-        location_service.setWayPoint(cur_loc.latitude, cur_loc.longitude);
+        if(cur_loc.locked)
+        {
+            LocationService::instance().setWayPoint(cur_loc.latitude, cur_loc.longitude);
+        }
 
+        CloudService &cloud_service = CloudService::instance();
         cloud_service.beginCommand("loc");
         cloud_service.writer().name("loc").beginObject();
         if (cur_loc.locked)
@@ -502,22 +388,19 @@ void TrackerLocation::loop()
         {
             cloud_service.writer().name("lck").value(0);
         }
-#ifdef TRACKER_THERMISTOR
-        if(!config_state.min_publish) {
-            cloud_service.writer().name("temp").value(get_temperature(), 1);
-        }
-#endif // TRACKER_THERMISTOR
         for(auto cb : locGenCallbacks)
         {
             cb(cloud_service.writer(), cur_loc);
         }
         cloud_service.writer().endObject();
-        if(!events.isEmpty())
+        if(!pending_triggers.isEmpty())
         {
+            std::lock_guard<std::recursive_mutex> lg(mutex);
             cloud_service.writer().name("trig").beginArray();
-            for (String event : events) {
-                cloud_service.writer().value(event);
+            for (auto trigger : pending_triggers) {
+                cloud_service.writer().value(trigger);
             }
+            pending_triggers.clear();
             cloud_service.writer().endArray();
         }
         Log.info("%.*s", cloud_service.writer().dataSize(), cloud_service.writer().buffer());
