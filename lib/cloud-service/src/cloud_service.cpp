@@ -91,7 +91,6 @@ void CloudService::tick_sec()
 int CloudService::regCommandCallback(const char *cmd, cloud_service_cb_t cb, uint32_t req_id, uint32_t timeout_ms, const void *context)
 {
     std::lock_guard<std::recursive_mutex> lg(mutex);
-    // TODO: Limit the number of registered handlers? Max for a non-0 (i.e. indefinite) timeout?
     cloud_service_handler_t handler = {CloudServicePublishFlags::NONE, cb, "", req_id, timeout_ms, context, millis()};
 
     if(!cb)
@@ -245,8 +244,6 @@ int CloudService::beginCommand(const char *cmd)
     // I2C device in order to format into the output command)
     mutex.lock();
 
-    // TODO: make sure it is safe to publish before wasting time generating the command?
-
     _writer = JSONBufferWriter(json_buf, sizeof(json_buf)); // reset the output
 
     writer().beginObject();
@@ -387,9 +384,6 @@ int CloudService::send(const char *event,
     // to know.
     
     // allocate space for handler info and copy of requesting event
-    // TODO: It may be necessary to throttle the outgoing requests similar to
-    // Device-OS in order to keep from consuming too much heap-space as we wait
-    // on application acknowledgements.
     cloud_service_send_handler_t *send_handler  =
         (cloud_service_send_handler_t *) malloc(sizeof(*send_handler) + event_len + 1);
     
@@ -410,9 +404,6 @@ int CloudService::send(const char *event,
         send_handler->cb = cb;
         send_handler->context = context;
         memcpy(send_handler->req_data, event, event_len + 1);
-        // force PRIVATE always for safety, I don't think there is much of 
-        // a use-case for public publishes
-        // TODO: If anyone disagrees...
         if(!background_publish.publish(_writer_event_name, event, publish_flags | PRIVATE, &CloudService::publish_cb, this, send_handler))
         {
             free(send_handler);

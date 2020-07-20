@@ -62,9 +62,6 @@ typedef struct cloud_service_handler_t {
     // match on this req_id (or 0 don't care)
     uint32_t req_id;
     // fail on match after a timeout, or 0 for never timeout
-    // TODO: Should this timeout apply from when the callback is registered?
-    // If someone initiates a send, should they immediately register the rsp
-    // callback? Or wait ontil there is a "send_success" callback?
     uint32_t timeout_ms;
     const void *context;
     uint32_t t0;
