@@ -34,4 +34,5 @@ class TrackerShipping
         shipping_mode_shutdown_cb_t shutdown_cb;
 
         int enter_cb(CloudServiceStatus status, JSONValue *root, const void *context);
+        static void shutdown();
 };

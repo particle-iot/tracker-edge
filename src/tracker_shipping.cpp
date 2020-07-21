@@ -16,8 +16,9 @@
 
 #include "tracker_shipping.h"
 
-#define SHIPPING_MODE_LED_CYCLE_PERIOD_MS (250)
-#define SHIPPING_MODE_LED_CYCLE_DURATION_MS (5000)
+#define SHIPPING_MODE_LED_CYCLE_PERIOD_MS       (250)
+#define SHIPPING_MODE_LED_CYCLE_DURATION_MS     (5000)
+#define SHIPPING_MODE_DEFER_DURATION_MS         (1000)
 
 int TrackerShipping::regShutdownCallback(shipping_mode_shutdown_cb_t cb)
 {
@@ -26,19 +27,9 @@ int TrackerShipping::regShutdownCallback(shipping_mode_shutdown_cb_t cb)
     return 0;
 }
 
-int TrackerShipping::enter()
+void TrackerShipping::shutdown()
 {
     PMIC pmic;
-
-    if(shutdown_cb)
-    {
-        int rval = shutdown_cb();
-
-        if(rval)
-        {
-            return rval;
-        }
-    }
 
     // blink RGB to signal entering shipping mode
     RGB.control(true);
@@ -69,6 +60,23 @@ int TrackerShipping::enter()
     // abundance of paranoia force a reset so we don't get stuck in some weird
     // pseudo-shutdown state
     System.reset();
+}
+
+int TrackerShipping::enter()
+{
+    if(shutdown_cb)
+    {
+        int rval = shutdown_cb();
+
+        if(rval)
+        {
+            return rval;
+        }
+    }
+
+    // Timer call will shutdown device so don't worry about dynamic memory
+    auto deferredShutdown = new Timer(SHIPPING_MODE_DEFER_DURATION_MS, TrackerShipping::shutdown, true);
+    deferredShutdown->start();
 
     return 0; // compiler warnings about no return...
 }
