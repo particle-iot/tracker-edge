@@ -317,10 +317,9 @@ int ConfigService::save(const char *name, bool force)
     return 0;
 }
 
-// TODO: A bug in Device-OS 1.5.3 caused newlib to call into the unsupported
-// _link() function rather than the supported _rename() function. As temporary
-// workaround until supported in Device-OS extern the _rename() function (also
-// exported via dynalb) and call directly.
+// A bug in Device-OS 1.5.3 caused newlib to call into the unsupported _link()
+// function rather than the supported _rename() function. As workaround extern
+// the _rename() function (also exported via dynalb) and call directly.
 extern "C" int _rename(const char* oldpath, const char* newpath);
 
 int ConfigService::_save(config_service_desc_t &config_desc, bool force)
@@ -583,7 +582,6 @@ int ConfigService::get_cfg_cb(CloudServiceStatus status, JSONValue *root, const 
         }
     }
 
-    // TODO: handle error/retry/callback
     CloudService::instance().sendAck(*root, rval);
     
     return rval;
@@ -650,7 +648,6 @@ int ConfigService::set_cfg_cb(CloudServiceStatus status, JSONValue *root, const 
         rval = -EINVAL;
     }
 
-    // TODO: handle error/retry/callback?
     CloudService::instance().sendAck(*root, rval);
 
     return rval;
@@ -732,7 +729,6 @@ int _config_process_json(JSONValue &json_root, const char *json_root_name, Confi
             break;
         case JSON_TYPE_ARRAY:
         {
-            // TODO: Need to add array support...
             error = -EINVAL;
             break;
         }

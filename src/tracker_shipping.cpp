@@ -63,16 +63,11 @@ int TrackerShipping::enter()
     // sleep forever waiting for power to be removed
     // leave network on for quicker drain of residual power
     // once main power is removed
-    // TODO: should we delay and try to let the network shutdown cleanly
-    // instead? 
     System.sleep(SLEEP_MODE_DEEP, 0, SLEEP_NETWORK_STANDBY);
 
     // shouldn't hit these lines as never coming back from sleep but out of an
     // abundance of paranoia force a reset so we don't get stuck in some weird
     // pseudo-shutdown state
-    // TODO: If/when a button is added we may decide to wake on button press to
-    // exit shipping mode (assuming non-lipo power is connected) which would
-    // also necessitate a reset here.
     System.reset();
 
     return 0; // compiler warnings about no return...
