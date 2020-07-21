@@ -1,3 +1,20 @@
+## v8
+
+### FEATURES
+
+- Detect and differentiate Tracker One and evaluation board products
+- Receive USB bus messages to configure parameters or command firmware
+
+### ENHANCEMENTS
+
+- Changed several tracker classes to singleton for ease-of-use
+
+### BUGFIXES
+
+ - Fixed memory leak with cloud service messages to be published
+ - Fixed memory leak related to GNSS power cycling
+
+
 ## v7
 
 ### FEATURES

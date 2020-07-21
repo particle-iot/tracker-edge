@@ -41,7 +41,7 @@
 #endif
 
 #ifndef TRACKER_PRODUCT_VERSION
-#define TRACKER_PRODUCT_VERSION               (7)
+#define TRACKER_PRODUCT_VERSION               (8)
 #endif
 
 #ifndef TRACKER_MODEL_NUMBER
