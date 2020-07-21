@@ -255,7 +255,6 @@ int Bmi160::setAccelRange(float& range, bool feedback) {
 
     CHECK(writeRegister(Bmi160Register::ACC_RANGE_ADDR, rangeEnum));
     rangeAccel_ = (int)workRange;
-    Serial1.printlnf("Range %d, %d", (int)rangeEnum, rangeAccel_);
 
     if (feedback) {
         range = workRange;
