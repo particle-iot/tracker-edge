@@ -285,7 +285,7 @@ int CloudService::send_cb_wrapper(CloudServiceStatus status, JSONValue *rsp_root
 
     int rval = send_handler->cb(status, rsp_root, send_handler->req_data, send_handler->context);
 
-    free(send_handler);
+    delete send_handler;
 
     return rval;
 }
@@ -384,8 +384,7 @@ int CloudService::send(const char *event,
     // to know.
     
     // allocate space for handler info and copy of requesting event
-    cloud_service_send_handler_t *send_handler  =
-        (cloud_service_send_handler_t *) malloc(sizeof(*send_handler) + event_len + 1);
+    cloud_service_send_handler_t *send_handler  = new cloud_service_send_handler_t;
     
     if(!send_handler)
     {
@@ -393,7 +392,6 @@ int CloudService::send(const char *event,
     }
     else
     {
-        memset(send_handler, 0, sizeof(*send_handler));
         send_handler->base_handler.cloud_flags = cloud_flags;
         send_handler->base_handler.cb = send_cb_wrapper;
         send_handler->base_handler.cmd[0] = '\0';
@@ -403,10 +401,10 @@ int CloudService::send(const char *event,
 
         send_handler->cb = cb;
         send_handler->context = context;
-        memcpy(send_handler->req_data, event, event_len + 1);
+        send_handler->req_data = event;
         if(!background_publish.publish(_writer_event_name, event, publish_flags | PRIVATE, &CloudService::publish_cb, this, send_handler))
         {
-            free(send_handler);
+            delete send_handler;
             rval = -EBUSY;
         }
     }
