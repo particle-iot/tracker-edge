@@ -158,6 +158,7 @@ void Tracker::loop()
     // fast operations for every loop
     CloudService::instance().tick();
     ConfigService::instance().tick();
+    TrackerMotion::instance().loop();
 
     // Check for Tracker One hardware
     if (_model == TRACKER_MODEL_TRACKERONE)
