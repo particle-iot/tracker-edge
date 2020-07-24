@@ -193,7 +193,7 @@ int Bmi160::reset() {
 int Bmi160::sleep() {
     const std::lock_guard<std::recursive_mutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
-    CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_LOW));
+    CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_SUSPEND));
     delay(4);
     return SYSTEM_ERROR_NONE;
 }
@@ -201,7 +201,7 @@ int Bmi160::sleep() {
 int Bmi160::wakeup() {
     const std::lock_guard<std::recursive_mutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
-    CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_NORMAL));
+    CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_LOW));
     delay(4);
     return SYSTEM_ERROR_NONE;
 }
@@ -286,8 +286,8 @@ int Bmi160::setAccelRate(float& rate, bool feedback) {
 
     auto odr = convertRateToOdr(workRate);
 
-    // Disable undersampling
-    uint8_t reg = odr | (ACCEL_CONF_BWP_NORMAL << ACC_CONF_BWP_SHIFT);
+    // Enable undersampling
+    uint8_t reg = ACC_CONF_USAMPLE_MASK | odr | (ACCEL_CONF_BWP_NORMAL << ACC_CONF_BWP_SHIFT);
 
     CHECK(writeRegister(Bmi160Register::ACC_CONF_ADDR, reg));
     rateAccel_ = convertOdrToRate(odr);
