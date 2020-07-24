@@ -1,9 +1,9 @@
 [submodule "lib/AM1805"]
 	path = lib/AM1805
-	url = git@github.com:particle-iot/AM1805.git
+	url = https://github.com/particle-iot/AM1805.git
 [submodule "lib/gps-nmea-parser"]
 	path = lib/gps-nmea-parser
-	url = git@github.com:particle-iot/gps-nmea-parser.git
+	url = https://github.com/particle-iot/gps-nmea-parser.git
 [submodule "lib/gps-ublox"]
 	path = lib/gps-ublox
-	url = git@github.com:particle-iot/gps-ublox.git
+	url = https://github.com/particle-iot/gps-ublox.git
