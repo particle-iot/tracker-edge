@@ -94,7 +94,10 @@ void TrackerLocation::init()
                 0, 86400l),
             ConfigBool("min_publish",
                 config_get_bool_cb, config_set_bool_cb,
-                &config_state.min_publish, &config_state_shadow.min_publish)
+                &config_state.min_publish, &config_state_shadow.min_publish),
+            ConfigBool("lock_trigger",
+                config_get_bool_cb, config_set_bool_cb,
+                &config_state.lock_trigger, &config_state_shadow.lock_trigger)
         },
         std::bind(&TrackerLocation::enter_location_config_cb, this, _1, _2),
         std::bind(&TrackerLocation::exit_location_config_cb, this, _1, _2, _3)
@@ -277,6 +280,8 @@ void TrackerLocation::loop()
 {
     static system_tick_t last_sample = 0;
     static int last_loc_locked_pub = 0;
+    static bool first_lock_triggered = false;
+
     LocationPoint cur_loc;
 
     //
@@ -309,7 +314,11 @@ void TrackerLocation::loop()
 
     if(cur_loc.locked != last_loc_locked_pub)
     {
-        triggerLocPub(Trigger::NORMAL,"lock");
+        if (config_state.lock_trigger || (!first_lock_triggered && cur_loc.locked != 0) )
+        {
+            first_lock_triggered = (first_lock_triggered || cur_loc.locked != 0);
+            triggerLocPub(Trigger::NORMAL,"lock");
+        }
     }
 
     //

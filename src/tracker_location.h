@@ -24,11 +24,13 @@
 #define TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC (30)
 #define TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC (300)
 #define TRACKER_LOCATION_MIN_PUBLISH_DEFAULT (false)
+#define TRACKER_LOCATION_LOCK_TRIGGER (true)
 
 struct tracker_location_config_t {
     int32_t interval_min_seconds; // 0 = no min
     int32_t interval_max_seconds; // 0 = no max
     bool min_publish;
+    bool lock_trigger;
 };
 
 enum class Trigger {
@@ -95,7 +97,8 @@ class TrackerLocation
             config_state = {
                 .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
                 .interval_max_seconds = TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC,
-                .min_publish = TRACKER_LOCATION_MIN_PUBLISH_DEFAULT
+                .min_publish = TRACKER_LOCATION_MIN_PUBLISH_DEFAULT,
+                .lock_trigger = TRACKER_LOCATION_LOCK_TRIGGER
             };
         }
         static TrackerLocation *_instance;
