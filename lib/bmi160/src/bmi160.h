@@ -82,6 +82,19 @@ enum class Bmi160InterruptSource {
     INTR_NO_MOTION,
 };
 
+enum Bmi160PmuAccel: uint8_t {
+    PMU_STATUS_ACC_SUSPEND              = 0x0,
+    PMU_STATUS_ACC_NORMAL               = 0x1,
+    PMU_STATUS_ACC_LOW                  = 0x2,
+};
+
+enum Bmi160PmuGyro: uint8_t {
+    PMU_STATUS_GYRO_SUSPEND             = 0x0,
+    PMU_STATUS_GYRO_NORMAL              = 0x1,
+    PMU_STATUS_GYRO_FAST_START_UP       = 0x3,
+};
+
+
 class Bmi160 {
 public:
     enum class Bmi160EventType {
@@ -200,6 +213,8 @@ private:
     const __SPISettings spiSettings_;
     pin_t intPin_;
     bool initialized_;
+    Bmi160PmuAccel accelPmu_;
+    Bmi160PmuGyro gyroPmu_;
     int rangeAccel_;
     float rateAccel_;
     uint8_t latchShadow_;
