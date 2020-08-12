@@ -15,8 +15,22 @@
  */
 
 #include "Particle.h"
-#include "tracker_config.h"
 #include "bmi160.h"
+
+#define USE_BMI160_SPI              (1)
+#define USE_BMI160_I2C              (0)
+
+#if (USE_BMI160_SPI == USE_BMI160_I2C)
+#error "SPI or I2C interface must be selected"
+#endif
+
+#define SPI_XFACE                   (SPI1)
+#define SPI_CS_PIN                  (SEN_CS)
+
+#define I2C_INTERFACE               (&Wire)
+#define I2C_ADDRESS                 (0x68)
+
+#define INT_PIN                     (SEN_INT)
 
 /*
 LOG_LEVEL_ALL   : special value that can be used to enable logging of all messages
@@ -40,8 +54,8 @@ Bmi160AccelerometerConfig config = {
 };
 
 Bmi160AccelMotionConfig configMotion = {
-    .mode               = Bmi160AccelMotionMode::ACCEL_MOTION_MODE_SIGNIFICANT,
-    .motionThreshold    = 1,      // g [up to range]
+    .mode               = Bmi160AccelMotionMode::ACCEL_MOTION_MODE_ANY,
+    .motionThreshold    = 0.25,      // g [up to range]
     .motionDuration     = 4,        // counts of rate period [1 -> 4]
     .motionSkip         = Bmi160AccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
     .motionProof        = Bmi160AccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
@@ -67,17 +81,17 @@ void setup() {
 
     int ret = 0;
 
-#if USE_BMI160_XFACE == BMI160_I2C
-    BMI160_I2C_INTERFACE->setSpeed(CLOCK_SPEED_100KHZ);
+#if USE_BMI160_I2C
+    I2C_INTERFACE->setSpeed(CLOCK_SPEED_100KHZ);
 
-    if (BMI160.begin(BMI160_I2C_INTERFACE, BMI160_I2C_ADDRESS, BMI160_INT_PIN) != SYSTEM_ERROR_NONE) {
+    if (BMI160.begin(I2C_INTERFACE, I2C_ADDRESS, INT_PIN) != SYSTEM_ERROR_NONE) {
         Serial1.printf("I2C BMI160.begin() failed.\r\n");
     }
 
-#elif USE_BMI160_XFACE == BMI160_SPI
-    BMI160_SPI_INTERFACE.begin();
+#elif USE_BMI160_SPI
+    SPI_XFACE.begin();
 
-    ret = BMI160.begin(BMI160_SPI_INTERFACE, BMI160_SPI_CS_PIN, BMI160_INT_PIN);
+    ret = BMI160.begin(SPI_XFACE, SPI_CS_PIN, INT_PIN);
     if (ret != SYSTEM_ERROR_NONE) {
         Serial1.printlnf("SPI BMI160.begin() failed. %d", ret);
     }
@@ -110,16 +124,16 @@ void loop() {
                 BMI160.reset();
                 BMI160.initAccelerometer(config);
                 BMI160.initMotion(configMotion);
-                BMI160.initHighG(configHighG);
+                ret = BMI160.initHighG(configHighG);
                 break;
             }
 
-            case '1':   BMI160.wakeup(); break;
-            case '2':   BMI160.sleep(); break;
-            case '3':   BMI160.startMotionDetect(); break;
-            case '4':   BMI160.stopMotionDetect(); break;
-            case '5':   BMI160.startHighGDetect(); break;
-            case '6':   BMI160.stopHighGDetect(); break;
+            case '1':   ret = BMI160.wakeup(); break;
+            case '2':   ret = BMI160.sleep(); break;
+            case '3':   ret = BMI160.startMotionDetect(); break;
+            case '4':   ret = BMI160.stopMotionDetect(); break;
+            case '5':   ret = BMI160.startHighGDetect(); break;
+            case '6':   ret = BMI160.stopHighGDetect(); break;
 
         }
         if (ret) {
@@ -156,7 +170,13 @@ void loop() {
     delay(UPDATE_DELAY);
 
     if (SLEEP_ENABLED && (millis() - sleepTime >= MOTION_TIMOUT)) {
-        System.sleep({BMI160_INT_PIN}, {FALLING}, WAKEUP_TIME);
+        SystemSleepConfiguration config;
+
+        config.mode(SystemSleepMode::ULTRA_LOW_POWER)
+            .gpio(INT_PIN, FALLING)
+            .duration(WAKEUP_TIME);
+
+        System.sleep(config);
         sleepTime = millis();
     }
 }

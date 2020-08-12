@@ -32,6 +32,8 @@ Bmi160::Bmi160()
           address_(INVALID_I2C_ADDRESS),
           spiSettings_(4*MHZ, MSBFIRST, SPI_MODE0),
           initialized_(false),
+          accelPmu_(PMU_STATUS_ACC_SUSPEND),
+          gyroPmu_(PMU_STATUS_GYRO_SUSPEND),
           rangeAccel_(BMI160_ACCEL_RANGE_DEFAULT),
           rateAccel_(BMI160_ACCEL_RATE_DEFAULT),
           latchShadow_(0),
@@ -51,7 +53,7 @@ Bmi160& Bmi160::getInstance() {
 int Bmi160::setSpiMode() {
     uint8_t dummy = 0;
     CHECK(readRegister(SPI_MODE_ADDR, &dummy, 1));
-    delay(100);
+    delay(BMI160_SPI_SELECT_TIME);
     return SYSTEM_ERROR_NONE;
 }
 
@@ -76,12 +78,23 @@ int Bmi160::initialize() {
         (IRQ_EDGE_LEVEL << INT_OUT_CTRL_INT1_EDGE_SHIFT)
         ));
 
-    // Map interrupts for any/significant motion and high G to INT1
+    // Map all interrupts for INT1
     CHECK(writeRegister(Bmi160Register::INT_MAP_0_ADDR,
+        INT_MAP_0_INT1_FLAT_MASK |
+        INT_MAP_0_INT1_ORIENT_MASK |
+        INT_MAP_0_INT1_S_TAP_MASK |
+        INT_MAP_0_INT1_D_TAP_MASK |
+        INT_MAP_0_INT1_NO_MOT_MASK |
         INT_MAP_0_INT1_ANYS_MOT_MASK |
-        INT_MAP_0_INT1_HIGH_G_MASK
+        INT_MAP_0_INT1_HIGH_G_MASK |
+        INT_MAP_0_INT1_LOW_G_MASK
         ));
-    CHECK(writeRegister(Bmi160Register::INT_MAP_1_ADDR, 0x00));
+    CHECK(writeRegister(Bmi160Register::INT_MAP_1_ADDR,
+        INT_MAP_1_INT1_DATA_MASK |
+        INT_MAP_1_INT1_FIFO_W_MASK |
+        INT_MAP_1_INT1_FIFO_F_MASK |
+        INT_MAP_1_INT1_PMU_MASK
+        ));
     CHECK(writeRegister(Bmi160Register::INT_MAP_2_ADDR, 0x00));
 
     return SYSTEM_ERROR_NONE;
@@ -96,7 +109,7 @@ int Bmi160::cleanup() {
 
     // Power down modules
     CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_SUSPEND));
-    delay(4);
+    delay(BMI160_ACC_PMU_CMD_TIME);
 
     return SYSTEM_ERROR_NONE;
 }
@@ -182,7 +195,10 @@ int Bmi160::reset() {
         CHECK(setSpiMode());
     }
     CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_SOFT_RESET));
-    delay(100);
+    delay(BMI160_SOFT_RESET_CMD_TIME);
+    accelPmu_ = PMU_STATUS_ACC_SUSPEND;
+    gyroPmu_ = PMU_STATUS_GYRO_SUSPEND;
+
     if (type_ == InterfaceType::BMI_SPI) {
         CHECK(setSpiMode());
     }
@@ -194,7 +210,8 @@ int Bmi160::sleep() {
     const std::lock_guard<std::recursive_mutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_SUSPEND));
-    delay(4);
+    delay(BMI160_ACC_PMU_CMD_TIME);
+    accelPmu_ = PMU_STATUS_ACC_SUSPEND;
     return SYSTEM_ERROR_NONE;
 }
 
@@ -202,7 +219,8 @@ int Bmi160::wakeup() {
     const std::lock_guard<std::recursive_mutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_LOW));
-    delay(4);
+    delay(BMI160_ACC_PMU_CMD_TIME);
+    accelPmu_ = PMU_STATUS_ACC_LOW;
     return SYSTEM_ERROR_NONE;
 }
 
@@ -540,11 +558,6 @@ int Bmi160::startMotionDetect() {
     reg |= INT_EN_0_ANYMO_Z_MASK | INT_EN_0_ANYMO_Y_MASK | INT_EN_0_ANYMO_X_MASK;
     CHECK(writeRegister(Bmi160Register::INT_EN_0_ADDR, reg));
 
-    // Enable interrupt for any/significant motion
-    CHECK(readRegister(Bmi160Register::INT_MAP_0_ADDR, &reg));
-    reg |= INT_MAP_0_INT1_ANYS_MOT_MASK;
-    CHECK(writeRegister(Bmi160Register::INT_MAP_0_ADDR, reg));
-
     return SYSTEM_ERROR_NONE;
 }
 
@@ -558,11 +571,6 @@ int Bmi160::stopMotionDetect() {
     CHECK(readRegister(Bmi160Register::INT_EN_0_ADDR, &reg));
     reg &= ~(INT_EN_0_ANYMO_Z_MASK | INT_EN_0_ANYMO_Y_MASK | INT_EN_0_ANYMO_X_MASK);
     CHECK(writeRegister(Bmi160Register::INT_EN_0_ADDR, reg));
-
-    // Disable interrupt for any/significant motion
-    CHECK(readRegister(Bmi160Register::INT_MAP_0_ADDR, &reg));
-    reg &= ~INT_MAP_0_INT1_ANYS_MOT_MASK;
-    CHECK(writeRegister(Bmi160Register::INT_MAP_0_ADDR, reg));
 
     return SYSTEM_ERROR_NONE;
 }
@@ -620,11 +628,6 @@ int Bmi160::startHighGDetect() {
     reg |= INT_EN_1_HIGH_G_Z_MASK | INT_EN_1_HIGH_G_Y_MASK | INT_EN_1_HIGH_G_X_MASK;
     CHECK(writeRegister(Bmi160Register::INT_EN_1_ADDR, reg));
 
-    // Enable interrupt for high G
-    CHECK(readRegister(Bmi160Register::INT_MAP_0_ADDR, &reg));
-    reg |= INT_MAP_0_INT1_HIGH_G_MASK;
-    CHECK(writeRegister(Bmi160Register::INT_MAP_0_ADDR, reg));
-
     return SYSTEM_ERROR_NONE;
 }
 
@@ -639,11 +642,6 @@ int Bmi160::stopHighGDetect() {
     reg &= ~(INT_EN_1_HIGH_G_Z_MASK | INT_EN_1_HIGH_G_Y_MASK | INT_EN_1_HIGH_G_X_MASK);
     CHECK(writeRegister(Bmi160Register::INT_EN_1_ADDR, reg));
 
-    // Disable interrupt for high G
-    CHECK(readRegister(Bmi160Register::INT_MAP_0_ADDR, &reg));
-    reg &= ~INT_MAP_0_INT1_HIGH_G_MASK;
-    CHECK(writeRegister(Bmi160Register::INT_MAP_0_ADDR, reg));
-
     return SYSTEM_ERROR_NONE;
 }
 
@@ -655,7 +653,7 @@ int Bmi160::getStatus(uint32_t& val, bool clear) {
     // Perform clear of latched interrupts by changing latch interval (as opposed to disabling and re-enabling interrupts)
     if (clear && ((latchShadow_ & INT_LATCH_MODE_MASK) == IRQ_LATCH_LATCHED)) {
         CHECK(writeRegister(Bmi160Register::INT_LATCH_ADDR, IRQ_LATCH_312_5_US));
-        delay(1);
+        delayMicroseconds(BMI160_INT_LATCH_CLEAR_TIME);
         CHECK(writeRegister(Bmi160Register::INT_LATCH_ADDR, latchShadow_));
     }
 
@@ -690,7 +688,14 @@ int Bmi160::writeRegister(uint8_t reg, uint8_t val) {
         buf[1] = val;
         wire_->beginTransmission(address_);
         wire_->write(buf, sizeof(buf));
-        return wire_->endTransmission();
+        auto ret = wire_->endTransmission();
+        if ((accelPmu_ == PMU_STATUS_ACC_LOW) ||
+            (accelPmu_ == PMU_STATUS_ACC_SUSPEND) ||
+            (gyroPmu_ == PMU_STATUS_GYRO_SUSPEND) ||
+            (gyroPmu_ == PMU_STATUS_GYRO_FAST_START_UP)) {
+            delayMicroseconds(BMI160_I2C_IDLE_TIME);
+        }
+        return ret;
     }
     else if (type_ == InterfaceType::BMI_SPI) {
         spi_->beginTransaction(spiSettings_);
@@ -699,6 +704,12 @@ int Bmi160::writeRegister(uint8_t reg, uint8_t val) {
         spi_->transfer(val);
         digitalWrite(csPin_, HIGH);
         spi_->endTransaction();
+        if ((accelPmu_ == PMU_STATUS_ACC_LOW) ||
+            (accelPmu_ == PMU_STATUS_ACC_SUSPEND) ||
+            (gyroPmu_ == PMU_STATUS_GYRO_SUSPEND) ||
+            (gyroPmu_ == PMU_STATUS_GYRO_FAST_START_UP)) {
+            delayMicroseconds(BMI160_SPI_IDLE_TIME);
+        }
         return SYSTEM_ERROR_NONE;
     }
 

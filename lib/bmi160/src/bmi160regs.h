@@ -25,6 +25,13 @@ const float ACCEL_FULL_RANGE = 32768.0;
 const uint8_t INVALID_I2C_ADDRESS = 0x7F;
 const int BMI160_ACCEL_RANGE_DEFAULT = 2; // g
 const float BMI160_ACCEL_RATE_DEFAULT = 100.0; // Hertz
+const unsigned int BMI160_I2C_IDLE_TIME = 400; // microseconds, idle time between I2C write accesses
+const unsigned int BMI160_SPI_IDLE_TIME = 470; // microseconds, idle time between SPI write accesses
+const unsigned long BMI160_SPI_SELECT_TIME = 10; // milliseconds, time to wait for I2C to SPI selection
+const unsigned long BMI160_ACC_PMU_CMD_TIME = 4; // milliseconds, PMU mode of accelerometer to normal or low power
+const unsigned long BMI160_GYRO_PMU_CMD_TIME = 80; // milliseconds, PMU mode of gyroscope to normal or fast start-up
+const unsigned long BMI160_SOFT_RESET_CMD_TIME = 1; // milliseconds, soft reset time
+const unsigned int BMI160_INT_LATCH_CLEAR_TIME = 400; // microseconds, idle time between I2C write accesses
 
 // Resister addresses
 enum Bmi160Register: uint8_t {
@@ -68,19 +75,9 @@ enum Bmi160Register: uint8_t {
 
 
 // PMU_STATUS register
-enum Bmi160PmuAccel: uint8_t {
-    PMU_STATUS_ACC_SUSPEND              = 0x0,
-    PMU_STATUS_ACC_NORMAL               = 0x1,
-    PMU_STATUS_ACC_LOW                  = 0x2,
-};
 #define PMU_STATUS_ACC_SHIFT            (4)
 #define PMU_STATUS_ACC_MASK             (0x3 << (PMU_STATUS_ACC_SHIFT))
 
-enum Bmi160PmuGyro: uint8_t {
-    PMU_STATUS_GYRO_SUSPEND             = 0x0,
-    PMU_STATUS_GYRO_NORMAL              = 0x1,
-    PMU_STATUS_GYRO_FAST_START_UP       = 0x3,
-};
 #define PMU_STATUS_GYRO_SHIFT           (2)
 #define PMU_STATUS_GYRO_MASK            (0x3 << (PMU_STATUS_GYRO_SHIFT))
 
