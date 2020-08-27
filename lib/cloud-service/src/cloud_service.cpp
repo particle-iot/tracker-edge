@@ -122,6 +122,12 @@ static int _get_common_fields(JSONValue &root, const char **cmd, const char **sr
     JSONObjectIterator it(root);
     while(it.next())
     {
+        if (!it.value().isValid())
+        {
+            rval = -EINVAL;
+            break;
+        }
+
         const char *it_name = (const char *) it.name();
         if(!strcmp(CLOUD_KEY_CMD, (const char *) it_name))
         {
@@ -192,7 +198,7 @@ int CloudService::dispatchCommand(String data)
 
     // for now we are expecting a full json object
     // in future we may accept non-json objects and process separately
-    if(!root.isObject())
+    if(!root.isObject() || !root.isValid())
     {
         return -EINVAL;
     }
