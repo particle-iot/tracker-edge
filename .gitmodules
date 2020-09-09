@@ -7,3 +7,6 @@
 [submodule "lib/gps-ublox"]
 	path = lib/gps-ublox
 	url = https://github.com/particle-iot/gps-ublox.git
+[submodule "lib/can-mcp25x"]
+	path = lib/can-mcp25x
+	url = https://github.com/particle-iot/can-mcp25x.git
