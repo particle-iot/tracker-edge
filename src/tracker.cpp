@@ -35,7 +35,7 @@ void ctrl_request_custom_handler(ctrl_request* req)
             result = SYSTEM_ERROR_INVALID_ARGUMENT;
         }
     }
-  
+
     system_ctrl_set_result(req, result, nullptr, nullptr, nullptr);
 }
 
@@ -116,7 +116,10 @@ void Tracker::init()
     if (_model == TRACKER_MODEL_TRACKERONE)
     {
         (void)GnssLedInit();
-        temperature_init(TRACKER_THERMISTOR);
+        temperature_init(TRACKER_THERMISTOR,
+            [this](){ return enableCharging();},
+            [this](){ return disableCharging();}
+        );
     }
 
     MotionService::instance().start();
@@ -185,6 +188,16 @@ int Tracker::stop()
     MotionService::instance().stop();
 
     return 0;
+}
+
+int Tracker::enableCharging() {
+    PMIC pmic(true);
+    return (pmic.enableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
+}
+
+int Tracker::disableCharging() {
+    PMIC pmic(true);
+    return (pmic.disableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
 }
 
 void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context)

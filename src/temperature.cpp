@@ -68,19 +68,22 @@ static ConfigData _temperatureConfig = {
 //  }
 
 enum class TempState {
+  UNKNOWN,        //< Initial state
   NORMAL,         //< Value is not outside limit and isn't pending a pass through the hysteresis limit
-  OUTSIDE_LIMIT,  //< Valie is outside of the given limit
+  OUTSIDE_LIMIT,  //< Value is outside of the given limit
   INSIDE_LIMIT,   //< Value is inside of the give limit and is pending a pass through the hysteresis limit
 };
 
 
 static Thermistor _thermistor;
+static TemperatureCallback _enableCharging = nullptr;
+static TemperatureCallback _disableCharging = nullptr;
 
 float get_temperature() {
   return _thermistor.getTemperature();
 }
 
-int temperature_init(pin_t analogPin) {  
+int temperature_init(pin_t analogPin, TemperatureCallback chargeEnable, TemperatureCallback chargeDisable) {
   CHECK(_thermistor.begin(analogPin, _thermistorConfig));
 
   static ConfigObject _serviceObject
@@ -98,6 +101,9 @@ int temperature_init(pin_t analogPin) {
   );
 
   CHECK(ConfigService::instance().registerModule(_serviceObject));
+
+  _enableCharging = chargeEnable;
+  _disableCharging = chargeDisable;
 
   return SYSTEM_ERROR_NONE;
 }
@@ -128,13 +134,13 @@ size_t temperature_low_events() {
   return (_temperatureConfig.lowLatch) ? lowLatch : eventsCount;
 }
 
-
-int temperature_tick() {
-  float temperature = get_temperature();
-
+void evaluate_user_temperature(float temperature) {
   // Evaluate temperature against high threshold
   if (_temperatureConfig.highEnable) {
     switch (highState) {
+      case TempState::UNKNOWN:
+        highState = TempState::NORMAL;
+        // Fall through
       case TempState::NORMAL: {
         if (temperature >= _temperatureConfig.highThreshold) {
           highEvents++;
@@ -167,6 +173,9 @@ int temperature_tick() {
   // Evaluate temperature against low threshold
   if (_temperatureConfig.lowEnable) {
     switch (lowState) {
+      case TempState::UNKNOWN:
+        lowState = TempState::NORMAL;
+        // Fall through
       case TempState::NORMAL: {
         if (temperature <= _temperatureConfig.lowThreshold) {
           lowEvents++;
@@ -195,6 +204,100 @@ int temperature_tick() {
       }
     }
   }
+}
+
+void enableCharging(float temperature) {
+  if (_enableCharging) {
+    _enableCharging();
+    Log.info("Battery charge temperature %0.1f C in range.  Enabling charge", temperature);
+  }
+}
+
+void disableCharging(float temperature) {
+  if (_disableCharging) {
+    _disableCharging();
+    Log.warn("Battery charge temperature %0.1f C out of range.  Disabling charge", temperature);
+  }
+}
+
+void evaluate_charge_temperature(float temperature) {
+  static unsigned int tick = 0;
+  static TempState chargeTempState = TempState::UNKNOWN;
+
+  if (System.uptime() - tick < ChargeTickRateSec) {
+    return;
+  }
+
+  tick = System.uptime();
+
+  bool isTempHigh = (temperature >= ChargeTempHighLimit); // Inclusive
+  bool isTempBelowHighHyst = (temperature <= (ChargeTempHighLimit - ChargeTempHyst)); // Inclusive
+  bool isTempLow = (temperature <= ChargeTempLowLimit); // Inclusive
+  bool isTempAboveLowHyst = (temperature >= (ChargeTempLowLimit + ChargeTempHyst)); // Inclusive
+
+  // The states are defined as follows:
+    //
+    //    OUTSIDE_LIMIT
+    //  ----------------^ 50 degC
+    //    INSIDE_LIMIT    49 degC
+    //  ----------------v 48 degC
+    //    NORMAL
+    //  ----------------^ 2 degC
+    //    INSIDE_LIMIT    1 degC
+    //  ----------------v 0 degC
+    //    OUTSIDE_LIMIT
+    //
+
+    switch (chargeTempState) {
+      case TempState::UNKNOWN: {
+        if (isTempHigh || isTempLow) {
+          disableCharging(temperature);
+          chargeTempState = TempState::OUTSIDE_LIMIT;
+          break;
+        }
+
+        enableCharging(temperature);
+        chargeTempState = TempState::NORMAL;
+        break;
+      }
+
+      case TempState::NORMAL: {
+        if (isTempHigh || isTempLow) {
+          disableCharging(temperature);
+          chargeTempState = TempState::OUTSIDE_LIMIT;
+        }
+        break;
+      }
+
+      case TempState::OUTSIDE_LIMIT: {
+        if (isTempBelowHighHyst && isTempAboveLowHyst) {
+          enableCharging(temperature);
+          chargeTempState = TempState::NORMAL;
+        }
+        else if ((!isTempHigh && !isTempBelowHighHyst) || (!isTempLow && !isTempAboveLowHyst)) {
+          chargeTempState = TempState::INSIDE_LIMIT;
+        }
+        break;
+      }
+
+      case TempState::INSIDE_LIMIT: {
+        if (isTempHigh || isTempLow) {
+          chargeTempState = TempState::OUTSIDE_LIMIT;
+        }
+        else if (isTempBelowHighHyst && isTempAboveLowHyst) {
+          enableCharging(temperature);
+          chargeTempState = TempState::NORMAL;
+        }
+        break;
+      }
+    }
+}
+
+int temperature_tick() {
+  float temperature = get_temperature();
+
+  evaluate_user_temperature(temperature);
+  evaluate_charge_temperature(temperature);
 
   return SYSTEM_ERROR_NONE;
 }

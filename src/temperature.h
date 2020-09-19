@@ -20,6 +20,8 @@
 #include "tracker_config.h"
 #include "config_service.h"
 
+using TemperatureCallback = std::function<int(void)>;
+
 // Default temperature high threshold.
 constexpr double TemperatureHighDefault = 25.0; // degrees celsius
 
@@ -28,6 +30,18 @@ constexpr double TemperatureLowDefault = 25.0; // degrees celsius
 
 // Default temperature hysteresis
 constexpr double TemperatureHysteresisDefault = 5.0; // degrees celsius
+
+// High limit to disable battery charging (inclusive)
+constexpr double ChargeTempHighLimit = 50.0; // degrees celsius
+
+// Low limit to disable battery charging (inclusive)
+constexpr double ChargeTempLowLimit = 0.0; // degrees celsius
+
+// Hysteresis applied to high/low limits to re-enable battery charging
+constexpr double ChargeTempHyst = 2.0; // degrees celsius
+
+// Rate, in seconds, to sample the temperature and evaluate battery charge enablement
+constexpr unsigned int ChargeTickRateSec = 60; // seconds
 
 /**
  * @brief Get the current temperature
@@ -58,7 +72,7 @@ size_t temperature_low_events();
  * @retval SYSTEM_ERROR_NONE
  * @retval SYSTEM_ERROR_INVALID_ARGUMENT
  */
-int temperature_init(pin_t analogPin);
+int temperature_init(pin_t analogPin, TemperatureCallback chargeEnable, TemperatureCallback chargeDisable);
 
 /**
  * @brief Process the temperature loop tick.

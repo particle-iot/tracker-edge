@@ -60,6 +60,9 @@ class Tracker
         uint32_t getModel() {return _model;}
         uint32_t getVariant() {return _variant;}
 
+        int enableCharging();
+        int disableCharging();
+
         bool isUsbCommandEnabled() { return _config.UsbCommandEnable; }
 
         // underlying services exposed to allow sharing with rest of the system
