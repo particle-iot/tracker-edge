@@ -79,6 +79,8 @@ MotionService::MotionService()
     : thread_(nullptr),
       counters_({0}),
       motionEventQueue_(nullptr),
+      mode_(MotionDetectionMode::NONE),
+      highGMode_(HighGDetectionMode::DISABLE),
       awakeFlags_(0),
       eventDepth_(0) {
 
