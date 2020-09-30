@@ -39,6 +39,18 @@ struct TrackerConfig
     bool UsbCommandEnable;
 };
 
+enum class TrackerChargeState
+{
+    CHARGE_INIT,
+    CHARGE_DONT_CARE,
+    CHARGE_CARE,
+};
+
+struct TrackerChargeStatus {
+    unsigned int uptime;
+    TrackerChargeState state;
+};
+
 // this class encapsulates the underlying modules and builds on top of them to
 // provide a cohesive asset tracking application
 class Tracker
@@ -53,6 +65,7 @@ class Tracker
             return *_instance;
         }
 
+        void enterLowBatteryShippingMode();
         void init();
         void loop();
         int stop();
@@ -75,7 +88,7 @@ class Tracker
 
         TrackerLocation &location;
         TrackerMotion &motion;
-        TrackerShipping shipping;
+        TrackerShipping &shipping;
         TrackerRGB &rgb;
     private:
         Tracker();
@@ -87,7 +100,23 @@ class Tracker
         uint32_t _variant;
 
         uint32_t last_loop_sec;
+        bool _pastWarnLimit;
+        unsigned int _evalTick;
+        bool _lastBatteryCharging;
+        bool _delayedBatteryCheck;
+        unsigned int _delayedBatteryCheckTick;
+        TrackerChargeStatus _pendingChargeStatus;
+        std::mutex _pendingLock;
+        TrackerChargeState _chargeStatus;
+        unsigned int _lowBatteryEvent;
 
         int registerConfig();
         static void loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context);
+        TrackerChargeState batteryDecode(battery_state_t state);
+        void setPendingChargeStatus(unsigned int uptime, TrackerChargeState state);
+        TrackerChargeStatus getPendingChargeStatus();
+        static void lowBatteryHandler(system_event_t event, int data);
+        static void batteryStateHandler(system_event_t event, int data);
+        void initBatteryMonitor();
+        void evaluateBatteryCharge();
 };

@@ -18,13 +18,20 @@
 
 #define SHIPPING_MODE_LED_CYCLE_PERIOD_MS       (250)
 #define SHIPPING_MODE_LED_CYCLE_DURATION_MS     (5000)
-#define SHIPPING_MODE_DEFER_DURATION_MS         (1000)
+#define SHIPPING_MODE_DEFER_DURATION_MS         (5000) // 5 seconds
+
+TrackerShipping *TrackerShipping::_instance = nullptr;
 
 int TrackerShipping::regShutdownCallback(shipping_mode_shutdown_cb_t cb)
 {
     shutdown_cb = cb;
 
     return 0;
+}
+
+void TrackerShipping::pmicHandler()
+{
+    TrackerShipping::instance()._pmicFire = true;
 }
 
 void TrackerShipping::shutdown()
@@ -43,9 +50,25 @@ void TrackerShipping::shutdown()
         HAL_Delay_Milliseconds(SHIPPING_MODE_LED_CYCLE_PERIOD_MS);
     }
 
+    auto shipping = &TrackerShipping::instance();
+    if (shipping->_checkPower)
+    {
+        // Attach and own the PMIC interrupt in order to provide the quickest
+        // way to figure out changes in PMIC input power right before going into
+        // shipping mode.
+        attachInterrupt(PMIC_INT, &TrackerShipping::pmicHandler, FALLING);
+    }
+
     WITH_LOCK(pmic)
     {
         pmic.disableWatchdog();
+        if (shipping->_checkPower && shipping->_pmicFire)
+        {
+            // If the PMIC interrupted us then reset instead of going into shipping mode because
+            // the power is likely to be applied between when the mode was commanded and the delayed
+            // response of this particular handler.
+            System.reset();
+        }
         pmic.disableBATFET();
     }
 
@@ -62,7 +85,7 @@ void TrackerShipping::shutdown()
     System.reset();
 }
 
-int TrackerShipping::enter()
+int TrackerShipping::enter(bool checkPower)
 {
     if(shutdown_cb)
     {
@@ -73,6 +96,9 @@ int TrackerShipping::enter()
             return rval;
         }
     }
+
+    // This flag will allow the shipping mode code to check power state before shutting down
+    _checkPower = checkPower;
 
     // Timer call will shutdown device so don't worry about dynamic memory
     auto deferredShutdown = new Timer(SHIPPING_MODE_DEFER_DURATION_MS, TrackerShipping::shutdown, true);

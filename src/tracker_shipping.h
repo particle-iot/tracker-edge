@@ -23,16 +23,28 @@ typedef std::function<int(void)> shipping_mode_shutdown_cb_t;
 class TrackerShipping
 {
     public:
-        TrackerShipping() : shutdown_cb(nullptr) {}
-        
+        static TrackerShipping& instance() {
+            if(!_instance)
+            {
+                _instance = new TrackerShipping();
+            }
+            return *_instance;
+        }
+
         void init();
 
-        int enter();
+        int enter(bool checkPower = false);
 
         int regShutdownCallback(shipping_mode_shutdown_cb_t cb);
     private:
+        TrackerShipping() : shutdown_cb(nullptr), _checkPower(false), _pmicFire(false) {}
+        static TrackerShipping* _instance;
+
         shipping_mode_shutdown_cb_t shutdown_cb;
+        bool _checkPower;
+        bool _pmicFire;
 
         int enter_cb(CloudServiceStatus status, JSONValue *root, const void *context);
         static void shutdown();
+        static void pmicHandler();
 };

@@ -19,6 +19,14 @@
 #include "tracker.h"
 #include "tracker_cellular.h"
 
+constexpr int TrackerLowBatteryCutoff = 8; // percent of battery charge
+constexpr int TrackerLowBatteryCutoffCorrection = 1; // percent of battery charge
+constexpr int TrackerLowBatteryWarning = 15; // percent of battery charge
+constexpr int TrackerLowBatteryWarningHyst = 1; // percent of battery charge
+constexpr unsigned int TrackerLowBatteryEvalTime = 15 * 60; // seconds to sample for low battery condition
+constexpr system_tick_t TrackerPostChargeSettleTime = 500; // milliseconds
+constexpr unsigned int TrackerLowBatteryStartTime = 20; // seconds to debounce low battery condition
+constexpr unsigned int TrackerLowBatteryDebounceTime = 5; // seconds to debounce low battery condition
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -49,8 +57,19 @@ Tracker::Tracker() :
     rtc(AM1805_PIN_INVALID, RTC_AM1805_I2C_INSTANCE, RTC_AM1805_I2C_ADDR),
     location(TrackerLocation::instance()),
     motion(TrackerMotion::instance()),
-    shipping(),
-    rgb(TrackerRGB::instance())
+    shipping(TrackerShipping::instance()),
+    rgb(TrackerRGB::instance()),
+    _model(TRACKER_MODEL_BARE_SOM),
+    _variant(0),
+    last_loop_sec(0),
+    _pastWarnLimit(false),
+    _evalTick(0),
+    _lastBatteryCharging(false),
+    _delayedBatteryCheck(true),
+    _delayedBatteryCheckTick(0),
+    _pendingChargeStatus{.uptime = 0, .state = TrackerChargeState::CHARGE_INIT},
+    _chargeStatus(TrackerChargeState::CHARGE_INIT),
+    _lowBatteryEvent(0)
 {
     _config =
     {
@@ -66,6 +85,171 @@ int Tracker::registerConfig()
     ConfigService::instance().registerModule(tracker_config);
 
     return 0;
+}
+
+void Tracker::enterLowBatteryShippingMode() {
+    // Publish then shutdown
+    Particle.publishVitals();
+    TrackerLocation::instance().triggerLocPub(Trigger::IMMEDIATE,"batt_low");
+    shipping.enter(true);
+}
+
+void Tracker::lowBatteryHandler(system_event_t event, int data) {
+    Tracker::instance()._lowBatteryEvent = System.uptime();
+}
+
+TrackerChargeState Tracker::batteryDecode(battery_state_t state) {
+    auto chargeStatus = TrackerChargeState::CHARGE_INIT;
+
+    switch (state) {
+        case BATTERY_STATE_UNKNOWN:
+        // Fall through
+        case BATTERY_STATE_FAULT:
+        // Fall through
+        case BATTERY_STATE_NOT_CHARGING:
+        // Fall through
+        case BATTERY_STATE_DISCHARGING: {
+            chargeStatus = TrackerChargeState::CHARGE_CARE;
+            break;
+        }
+
+        case BATTERY_STATE_CHARGING:
+        // Fall through
+        case BATTERY_STATE_CHARGED:
+        // Fall through
+        case BATTERY_STATE_DISCONNECTED: {
+            chargeStatus = TrackerChargeState::CHARGE_DONT_CARE;
+            break;
+        }
+    }
+
+    return chargeStatus;
+}
+
+void Tracker::setPendingChargeStatus(unsigned int uptime, TrackerChargeState state) {
+    const std::lock_guard<std::mutex> lock(_pendingLock);
+    _pendingChargeStatus.uptime = uptime;
+    _pendingChargeStatus.state = state;
+}
+
+TrackerChargeStatus Tracker::getPendingChargeStatus() {
+    const std::lock_guard<std::mutex> lock(_pendingLock);
+    return _pendingChargeStatus;
+}
+
+void Tracker::batteryStateHandler(system_event_t event, int data) {
+    auto currentChargeStatus = Tracker::instance().batteryDecode(static_cast<battery_state_t>(data));
+
+    Tracker::instance().setPendingChargeStatus(System.uptime(), currentChargeStatus);
+}
+
+
+void Tracker::initBatteryMonitor() {
+    // To initialize the fuel gauge so that it provides semi-accurate readings we
+    // want to ensure that the charging circuit is off when providing the
+    // fuel gauge quick start command.
+    // In order to disable charging safely we want to enable the PMIC watchdog so that
+    // if anything happens during the procedure that the circuit can return to
+    // normal operation in the event the MCU doesn't complete.
+    PMIC pmic(true);
+    FuelGauge fuelGauge;
+
+    pmic.setWatchdog(0x1); // 40 seconds
+    pmic.disableCharging();
+    // Delay so that the bulk capacitance and battery can equalize
+    delay(TrackerPostChargeSettleTime);
+
+    fuelGauge.quickStart();
+    // Must delay at least 175ms after quickstart, before calling
+    // getSoC(), or reading will not have updated yet.
+    delay(200);
+
+    pmic.enableCharging();
+    pmic.disableWatchdog();
+}
+
+void Tracker::evaluateBatteryCharge() {
+    // This is delayed intialization for the fuel gauge threshold since power on
+    // events may glitch between battery states easily.
+    if (_delayedBatteryCheck) {
+        if (System.uptime() >= TrackerLowBatteryStartTime) {
+            _delayedBatteryCheck = false;
+            FuelGauge fuelGauge;
+
+            // Set the alert level for 8% - 1%.  This value will not be normalized but rather the raw
+            // threshold value provided by the fuel gauge.
+            // The fuel gauge will only give an alert when passing through this limit with decreasing
+            // succesive charge amounts.  It is important to check whether we are already below this limit
+            fuelGauge.setAlertThreshold((uint8_t)(TrackerLowBatteryCutoff - TrackerLowBatteryCutoffCorrection));
+            fuelGauge.clearAlert();
+            delay(100);
+
+            // NOTE: This is a workaround in case the fuel gauge interrupt is not configured as an input
+            pinMode(LOW_BAT_UC, INPUT_PULLUP);
+
+            System.on(low_battery, lowBatteryHandler);
+            System.on(battery_state, batteryStateHandler);
+            if (_chargeStatus == TrackerChargeState::CHARGE_INIT) {
+                setPendingChargeStatus(System.uptime(), batteryDecode(static_cast<battery_state_t>(System.batteryState())));
+            }
+        }
+    }
+
+    // Debounce the charge status here by looking at data collected by the interrupt handler and making sure that the
+    // last state is present over a qualified amount of time.
+    auto status = getPendingChargeStatus();
+    if (status.uptime && ((System.uptime() - status.uptime) >= TrackerLowBatteryDebounceTime)) {
+        _chargeStatus = status.state;
+        setPendingChargeStatus(0, _chargeStatus);
+        _evalTick = System.uptime();
+    }
+
+    // No further work necessary if we are still in the delayed battery check interval or not on a evaluation interval
+    if (_delayedBatteryCheck ||
+        (System.uptime() - _evalTick < TrackerLowBatteryEvalTime)) {
+
+        return;
+    }
+    _evalTick = System.uptime();
+
+    auto stateOfCharge = System.batteryCharge();
+
+    // Skip errors
+    if (stateOfCharge < 0.0) {
+        return;
+    }
+
+    switch (_chargeStatus) {
+        case TrackerChargeState::CHARGE_CARE: {
+            if (_lowBatteryEvent || (stateOfCharge <= (float)TrackerLowBatteryCutoff)) {
+                // Publish then shutdown
+                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
+                enterLowBatteryShippingMode();
+            }
+            else if (!_pastWarnLimit && (stateOfCharge <= (float)TrackerLowBatteryWarning)) {
+                _pastWarnLimit = true;
+                // Publish once when falling through this value
+                Particle.publishVitals();
+                location.triggerLocPub(Trigger::IMMEDIATE,"batt_warn");
+                Log.warn("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Publishing warning", stateOfCharge, (float)TrackerLowBatteryWarning);
+            }
+            break;
+        }
+
+        case TrackerChargeState::CHARGE_DONT_CARE: {
+            // There may be instances where the device is being charged but the battery is still being discharged
+            if (_lowBatteryEvent) {
+                // Publish then shutdown
+                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
+                enterLowBatteryShippingMode();
+            }
+            else if (_pastWarnLimit && (stateOfCharge >= (float)(TrackerLowBatteryWarning + TrackerLowBatteryWarningHyst))) {
+                _pastWarnLimit = false;
+                // Publish again to announce that we are out of low battery warning
+                Particle.publishVitals();
+            }
+        }
+    }
 }
 
 void Tracker::init()
@@ -92,6 +276,12 @@ void Tracker::init()
 
     // PIN_INVALID to disable unnecessary config of a default CS pin
     SPI.begin(PIN_INVALID);
+
+    // Reset the fuel gauge state-of-charge, check if under thresholds
+    if (_model == TRACKER_MODEL_TRACKERONE)
+    {
+        initBatteryMonitor();
+    }
 
     CloudService::instance().init();
 
@@ -156,6 +346,12 @@ void Tracker::loop()
         #ifndef RTC_WDT_DISABLE
             wdt_rtc->reset_wdt();
         #endif
+    }
+
+    // Evaluate low battery conditions
+    if (_model == TRACKER_MODEL_TRACKERONE)
+    {
+        evaluateBatteryCharge();
     }
 
     // fast operations for every loop
