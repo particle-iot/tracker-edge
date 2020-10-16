@@ -192,10 +192,18 @@ public:
 
     /**
      * @brief Get the event queue depth
-     * 
+     *
      * @return size_t Queue capacity
      */
     size_t getQueueDepth();
+
+    /**
+     * @brief Indicate if any IMU module is awake
+     *
+     * @return true At least one module is keeping the IMU from sleeping
+     * @return false No modules are keeping the IMU from sleeping
+     */
+    bool isAnyAwake();
 
 private:
 
@@ -222,14 +230,6 @@ private:
      * @param bits Bitmap of flags to clear
      */
     void clearAwakeFlag(uint32_t bits);
-
-    /**
-     * @brief Indicate if any IMU module is awake
-     *
-     * @return true At least one module is keeping the IMU from sleeping
-     * @return false No modules are keeping the IMU from sleeping
-     */
-    bool isAnyoneAwake();
 
     os_thread_t thread_;
     MotionCounters counters_;

@@ -18,15 +18,23 @@
 
 #include "tracker.h"
 #include "tracker_cellular.h"
+#include "mcp_can.h"
 
-constexpr int TrackerLowBatteryCutoff = 8; // percent of battery charge
+// Defines and constants
+constexpr int CanSleepRetries = 10; // Based on a series of 10ms delays
+
+constexpr int TrackerLowBatteryCutoff = 2; // percent of battery charge
 constexpr int TrackerLowBatteryCutoffCorrection = 1; // percent of battery charge
-constexpr int TrackerLowBatteryWarning = 15; // percent of battery charge
+constexpr int TrackerLowBatteryWarning = 8; // percent of battery charge
 constexpr int TrackerLowBatteryWarningHyst = 1; // percent of battery charge
-constexpr unsigned int TrackerLowBatteryEvalTime = 15 * 60; // seconds to sample for low battery condition
+constexpr unsigned int TrackerLowBatteryAwakeEvalInterval = 15 * 60; // seconds to sample for low battery condition
+constexpr unsigned int TrackerLowBatterySleepEvalInterval = 1; // seconds to sample for low battery condition
+constexpr unsigned int TrackerLowBatterySleepWakeInterval = 15 * 60; // seconds to sample for low battery condition
 constexpr system_tick_t TrackerPostChargeSettleTime = 500; // milliseconds
 constexpr unsigned int TrackerLowBatteryStartTime = 20; // seconds to debounce low battery condition
 constexpr unsigned int TrackerLowBatteryDebounceTime = 5; // seconds to debounce low battery condition
+constexpr unsigned int TrackerChargingAwakeEvalTime = 10; // seconds to sample the PMIC charging state
+constexpr unsigned int TrackerChargingSleepEvalTime = 1; // seconds to sample the PMIC charging state
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -52,6 +60,7 @@ Tracker *Tracker::_instance = nullptr;
 Tracker::Tracker() :
     cloudService(CloudService::instance()),
     configService(ConfigService::instance()),
+    sleep(TrackerSleep::instance()),
     locationService(LocationService::instance()),
     motionService(MotionService::instance()),
     rtc(AM1805_PIN_INVALID, RTC_AM1805_I2C_INSTANCE, RTC_AM1805_I2C_ADDR),
@@ -69,7 +78,9 @@ Tracker::Tracker() :
     _delayedBatteryCheckTick(0),
     _pendingChargeStatus{.uptime = 0, .state = TrackerChargeState::CHARGE_INIT},
     _chargeStatus(TrackerChargeState::CHARGE_INIT),
-    _lowBatteryEvent(0)
+    _lowBatteryEvent(0),
+    _evalChargingTick(0),
+    _batteryChargeEnabled(true)
 {
     _config =
     {
@@ -82,16 +93,101 @@ int Tracker::registerConfig()
     static ConfigObject tracker_config("tracker", {
         ConfigBool("usb_cmd", &_config.UsbCommandEnable),
     });
-    ConfigService::instance().registerModule(tracker_config);
+    configService.registerModule(tracker_config);
 
     return 0;
 }
 
-void Tracker::enterLowBatteryShippingMode() {
+void Tracker::initIo()
+{
+    // Initialize basic Tracker GPIO to known inactive values until they are needed later
+
+    // ESP32 related GPIO
+    pinMode(ESP32_BOOT_MODE_PIN, OUTPUT);
+    digitalWrite(ESP32_BOOT_MODE_PIN, HIGH);
+    pinMode(ESP32_PWR_EN_PIN, OUTPUT);
+    digitalWrite(ESP32_PWR_EN_PIN, LOW); // power off device, first power off for ESP32 workaround for low power
+    delay(50); // ESP32 workaround for low power
+    digitalWrite(ESP32_PWR_EN_PIN, HIGH); // power on device, ESP32 workaround for low power
+    delay(50); // ESP32 workaround for low power
+    digitalWrite(ESP32_PWR_EN_PIN, LOW); // power off device
+    pinMode(ESP32_CS_PIN, OUTPUT);
+    digitalWrite(ESP32_CS_PIN, HIGH);
+
+    // CAN related GPIO
+    pinMode(MCP_CAN_STBY_PIN, OUTPUT);
+    digitalWrite(MCP_CAN_STBY_PIN, LOW);
+    pinMode(MCP_CAN_PWR_EN_PIN, OUTPUT);
+    digitalWrite(MCP_CAN_PWR_EN_PIN, HIGH); // The CAN 5V power supply will be enabled for a short period
+    pinMode(MCP_CAN_RESETN_PIN, OUTPUT);
+    digitalWrite(MCP_CAN_RESETN_PIN, HIGH);
+    pinMode(MCP_CAN_INT_PIN, INPUT_PULLUP);
+    pinMode(MCP_CAN_CS_PIN, OUTPUT);
+    digitalWrite(MCP_CAN_CS_PIN, HIGH);
+
+    // Reset CAN transceiver
+    digitalWrite(MCP_CAN_RESETN_PIN, LOW);
+    delay(50);
+    digitalWrite(MCP_CAN_RESETN_PIN, HIGH);
+    delay(50);
+
+    // Initialize CAN device driver
+    MCP_CAN can(MCP_CAN_CS_PIN, MCP_CAN_SPI_INTERFACE);
+    if (can.begin(MCP_RX_ANY, CAN_1000KBPS, MCP_20MHZ) != CAN_OK)
+    {
+        Log.error("CAN init failed");
+    }
+    Log.info("CAN status: 0x%x", can.getCANStatus());
+    if (can.setMode(MODE_NORMAL)) {
+        Log.error("CAN mode to NORMAL failed");
+    }
+    else {
+        Log.info("CAN mode to NORMAL");
+    }
+    delay(500);
+
+    // Set to standby
+    digitalWrite(MCP_CAN_STBY_PIN, HIGH);
+    digitalWrite(MCP_CAN_PWR_EN_PIN, LOW); // The CAN 5V power supply will now be disabled
+
+    for (int retries = CanSleepRetries; retries >= 0; retries--) {
+        auto stat = can.getCANStatus() & MODE_MASK;
+        if (stat == MODE_SLEEP) {
+            Log.info("CAN mode to SLEEP");
+            break;
+        }
+        // Retry setting the sleep mode
+        if (can.setMode(MODE_SLEEP)) {
+            Log.error("CAN mode not set to SLEEP");
+        }
+        delay(10);
+    }
+}
+
+void Tracker::enableWatchdog(bool enable) {
+#ifndef RTC_WDT_DISABLE
+    if (enable) {
+        // watchdog at 1 minute
+        rtc.configure_wdt(true, 15, AM1805_WDT_REGISTER_WRB_QUARTER_HZ);
+        rtc.reset_wdt();
+    }
+    else {
+        rtc.disable_wdt();
+    }
+#else
+    (void)enable;
+#endif // RTC_WDT_DISABLE
+}
+
+void Tracker::startLowBatteryShippingMode() {
+    if (sleep.isForcedShutdownPending()) {
+        return;
+    }
+
     // Publish then shutdown
-    Particle.publishVitals();
-    TrackerLocation::instance().triggerLocPub(Trigger::IMMEDIATE,"batt_low");
-    shipping.enter(true);
+    sleep.forcePublishVitals();
+    location.triggerLocPub(Trigger::IMMEDIATE,"batt_low");
+    sleep.forceShutdown();
 }
 
 void Tracker::lowBatteryHandler(system_event_t event, int data) {
@@ -164,11 +260,30 @@ void Tracker::initBatteryMonitor() {
     // getSoC(), or reading will not have updated yet.
     delay(200);
 
-    pmic.enableCharging();
+    if (_batteryChargeEnabled) {
+        pmic.enableCharging();
+    }
     pmic.disableWatchdog();
 }
 
+bool Tracker::getChargeEnabled() {
+    auto chargeStatus = (PMIC().readPowerONRegister() >> 4) & 0b11; // Mask on bits 4 and 5
+    return (chargeStatus != 0b00);
+}
+
 void Tracker::evaluateBatteryCharge() {
+    // Manage charge enablement/disablement workaround
+    unsigned int evalChargingInterval = sleep.isSleepDisabled() ? TrackerChargingAwakeEvalTime : TrackerChargingSleepEvalTime;
+    if (System.uptime() - _evalChargingTick > evalChargingInterval) {
+        auto chargeEnabled = getChargeEnabled();
+        if (!chargeEnabled && _batteryChargeEnabled) {
+            enableCharging();
+        }
+        else if (chargeEnabled && !_batteryChargeEnabled) {
+            disableCharging();
+        }
+    }
+
     // This is delayed intialization for the fuel gauge threshold since power on
     // events may glitch between battery states easily.
     if (_delayedBatteryCheck) {
@@ -176,7 +291,7 @@ void Tracker::evaluateBatteryCharge() {
             _delayedBatteryCheck = false;
             FuelGauge fuelGauge;
 
-            // Set the alert level for 8% - 1%.  This value will not be normalized but rather the raw
+            // Set the alert level for <SET VALUE> - 1%.  This value will not be normalized but rather the raw
             // threshold value provided by the fuel gauge.
             // The fuel gauge will only give an alert when passing through this limit with decreasing
             // succesive charge amounts.  It is important to check whether we are already below this limit
@@ -205,17 +320,20 @@ void Tracker::evaluateBatteryCharge() {
     }
 
     // No further work necessary if we are still in the delayed battery check interval or not on a evaluation interval
+    unsigned int evalLoopInterval = sleep.isSleepDisabled() ? TrackerLowBatteryAwakeEvalInterval : TrackerLowBatterySleepEvalInterval;
     if (_delayedBatteryCheck ||
-        (System.uptime() - _evalTick < TrackerLowBatteryEvalTime)) {
+        (System.uptime() - _evalTick < evalLoopInterval)) {
 
         return;
     }
+
     _evalTick = System.uptime();
 
     auto stateOfCharge = System.batteryCharge();
 
     // Skip errors
     if (stateOfCharge < 0.0) {
+        Log.info("Battery charge reporting error");
         return;
     }
 
@@ -224,7 +342,7 @@ void Tracker::evaluateBatteryCharge() {
             if (_lowBatteryEvent || (stateOfCharge <= (float)TrackerLowBatteryCutoff)) {
                 // Publish then shutdown
                 Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
-                enterLowBatteryShippingMode();
+                startLowBatteryShippingMode();
             }
             else if (!_pastWarnLimit && (stateOfCharge <= (float)TrackerLowBatteryWarning)) {
                 _pastWarnLimit = true;
@@ -241,7 +359,7 @@ void Tracker::evaluateBatteryCharge() {
             if (_lowBatteryEvent) {
                 // Publish then shutdown
                 Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
-                enterLowBatteryShippingMode();
+                startLowBatteryShippingMode();
             }
             else if (_pastWarnLimit && (stateOfCharge >= (float)(TrackerLowBatteryWarning + TrackerLowBatteryWarningHyst))) {
                 _pastWarnLimit = false;
@@ -252,8 +370,49 @@ void Tracker::evaluateBatteryCharge() {
     }
 }
 
+void Tracker::onSleepPrepare(TrackerSleepContext context)
+{
+    configService.flush();
+    if (_model == TRACKER_MODEL_TRACKERONE) {
+        TrackerSleep::instance().wakeAtSeconds(System.uptime() + TrackerLowBatterySleepWakeInterval);
+    }
+}
+
+void Tracker::onSleep(TrackerSleepContext context)
+{
+    if (_model == TRACKER_MODEL_TRACKERONE) {
+        GnssLedEnable(false);
+    }
+}
+
+void Tracker::onWake(TrackerSleepContext context)
+{
+    if (_model == TRACKER_MODEL_TRACKERONE) {
+        // Battery charge enable/disable enforcement upon wake in case the Power Manager overrides the setting
+        if (_batteryChargeEnabled) {
+            enableCharging();
+        }
+        else {
+            disableCharging();
+        }
+
+        GnssLedEnable(true);
+        // Ensure battery evaluation starts immediately after waking
+        _evalTick = 0;
+    }
+}
+
+void Tracker::onSleepStateChange(TrackerSleepContext context)
+{
+    if (context.reason == TrackerSleepReason::STATE_TO_SHUTDOWN) {
+        // Consider any device shutdown here
+    }
+}
+
 void Tracker::init()
 {
+    int ret = 0;
+
     last_loop_sec = System.uptime();
 
     // mark setup as complete to skip mobile app commissioning flow
@@ -264,7 +423,8 @@ void Tracker::init()
         dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, DCT_SETUP_DONE_SIZE);
     }
 
-    int ret = hal_get_device_hw_model(&_model, &_variant, nullptr);
+#ifndef TRACKER_MODEL_NUMBER
+    ret = hal_get_device_hw_model(&_model, &_variant, nullptr);
     if (ret)
     {
         Log.error("Failed to read device model and variant");
@@ -273,9 +433,20 @@ void Tracker::init()
     {
         Log.info("Tracker model = %04lX, variant = %04lX", _model, _variant);
     }
+#else
+    _model = TRACKER_MODEL_NUMBER;
+#ifdef TRACKER_MODEL_VARIANT
+    _variant = TRACKER_MODEL_VARIANT;
+#else
+    _variant = 0;
+#endif // TRACKER_MODEL_VARIANT
+#endif // TRACKER_MODEL_NUMBER
 
     // PIN_INVALID to disable unnecessary config of a default CS pin
     SPI.begin(PIN_INVALID);
+
+	// Initialize unused interfaces and pins
+    initIo();
 
     // Reset the fuel gauge state-of-charge, check if under thresholds
     if (_model == TRACKER_MODEL_TRACKERONE)
@@ -283,14 +454,20 @@ void Tracker::init()
         initBatteryMonitor();
     }
 
-    CloudService::instance().init();
+    cloudService.init();
 
-    ConfigService::instance().init();
+    configService.init();
+
+    sleep.init([this](bool enable){ this->enableWatchdog(enable); });
+    sleep.registerSleepPrepare([this](TrackerSleepContext context){ this->onSleepPrepare(context); });
+    sleep.registerSleep([this](TrackerSleepContext context){ this->onSleep(context); });
+    sleep.registerWake([this](TrackerSleepContext context){ this->onWake(context); });
+    sleep.registerStateChange([this](TrackerSleepContext context){ this->onSleepStateChange(context); });
 
     // Register our own configuration settings
     registerConfig();
 
-    ret = LocationService::instance().begin(UBLOX_SPI_INTERFACE,
+    ret = locationService.begin(UBLOX_SPI_INTERFACE,
         UBLOX_CS_PIN,
         UBLOX_PWR_EN_PIN,
         UBLOX_TX_READY_MCU_PIN,
@@ -300,7 +477,7 @@ void Tracker::init()
         Log.error("Failed to begin location service");
     }
 
-    LocationService::instance().start();
+    locationService.start();
 
     // Check for Tracker One hardware
     if (_model == TRACKER_MODEL_TRACKERONE)
@@ -312,7 +489,7 @@ void Tracker::init()
         );
     }
 
-    MotionService::instance().start();
+    motionService.start();
 
     location.init();
 
@@ -324,12 +501,7 @@ void Tracker::init()
     rgb.init();
 
     rtc.begin();
-#ifdef RTC_WDT_DISABLE
-    rtc.disable_wdt();
-#else
-    // watchdog at 1 minute
-    rtc.configure_wdt(true, 15, AM1805_WDT_REGISTER_WRB_QUARTER_HZ);
-#endif
+    enableWatchdog(true);
 
     location.regLocGenCallback(loc_gen_cb);
 }
@@ -343,9 +515,9 @@ void Tracker::loop()
     {
         last_loop_sec = cur_sec;
 
-        #ifndef RTC_WDT_DISABLE
-            wdt_rtc->reset_wdt();
-        #endif
+#ifndef RTC_WDT_DISABLE
+        rtc.reset_wdt();
+#endif
     }
 
     // Evaluate low battery conditions
@@ -355,9 +527,8 @@ void Tracker::loop()
     }
 
     // fast operations for every loop
-    CloudService::instance().tick();
-    ConfigService::instance().tick();
-    TrackerMotion::instance().loop();
+    sleep.loop();
+    motion.loop();
 
     // Check for Tracker One hardware
     if (_model == TRACKER_MODEL_TRACKERONE)
@@ -375,24 +546,30 @@ void Tracker::loop()
         }
     }
 
+
+    // fast operations for every loop
+    cloudService.tick();
+    configService.tick();
     location.loop();
 }
 
 int Tracker::stop()
 {
-    LocationService::instance().stop();
-    MotionService::instance().stop();
+    locationService.stop();
+    motionService.stop();
 
     return 0;
 }
 
 int Tracker::enableCharging() {
     PMIC pmic(true);
+    _batteryChargeEnabled = true;
     return (pmic.enableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
 }
 
 int Tracker::disableCharging() {
     PMIC pmic(true);
+    _batteryChargeEnabled = false;
     return (pmic.disableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
 }
 

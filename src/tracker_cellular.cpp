@@ -32,7 +32,7 @@ void TrackerCellular::thread_f()
         {
             CellularSignal rssi = Cellular.RSSI();
 
-            if(rssi.rssi < 0)
+            if(rssi.getStrengthValue() < 0)
             {
                 auto uptime = System.uptime();
                 WITH_LOCK(mutex)
@@ -58,7 +58,7 @@ void TrackerCellular::thread_f()
 
 int TrackerCellular::getSignal(CellularSignal &signal, unsigned int max_age)
 {
-    const std::lock_guard<std::recursive_mutex> lg(mutex);
+    const std::lock_guard<RecursiveMutex> lg(mutex);
 
     if(!_signal_update || System.uptime() - _signal_update > max_age)
     {

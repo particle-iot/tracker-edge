@@ -77,7 +77,10 @@ void TrackerShipping::shutdown()
     // sleep forever waiting for power to be removed
     // leave network on for quicker drain of residual power
     // once main power is removed
-    System.sleep(SLEEP_MODE_DEEP, 0, SLEEP_NETWORK_STANDBY);
+    SystemSleepConfiguration config;
+    config.mode(SystemSleepMode::HIBERNATE)
+      .gpio(PMIC_INT, FALLING);
+    System.sleep(config);
 
     // shouldn't hit these lines as never coming back from sleep but out of an
     // abundance of paranoia force a reset so we don't get stuck in some weird

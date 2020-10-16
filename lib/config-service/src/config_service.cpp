@@ -99,7 +99,7 @@ int ConfigObject::exit(bool write, int status)
 bool ConfigFloat::check(double value)
 {
     return (
-        (isnan(range_min) || value >= range_min) && 
+        (isnan(range_min) || value >= range_min) &&
         (isnan(range_max) || value <= range_max)
     );
 };
@@ -168,7 +168,7 @@ void ConfigService::init()
     CloudService::instance().regCommandCallback("set_cfg", &ConfigService::set_cfg_cb, this);
     CloudService::instance().regCommandCallback("get_cfg", &ConfigService::get_cfg_cb, this);
     CloudService::instance().regCommandCallback("reset_to_factory", &ConfigService::reset_to_factory_cb, this);
-    
+
     struct stat st;
 
     if (!stat(CONFIG_SERVICE_FS_PATH, &st))
@@ -195,6 +195,18 @@ void ConfigService::tick()
     {
         last_tick_sec = sec;
         tick_sec();
+    }
+}
+
+void ConfigService::flush()
+{
+    if(fs_ok)
+    {
+        for(auto &it : configs)
+        {
+            config_hash(it.root, it.hash);
+        }
+        save_all();
     }
 }
 
@@ -375,12 +387,12 @@ int ConfigService::_save(config_service_desc_t &config_desc, bool force)
 
     close(fd);
 
-    // then rename over the existing config 
+    // then rename over the existing config
     if(!error)
     {
         if(_rename(temp_filename, filename))
         {
-           error = -errno; 
+           error = -errno;
         }
         else
         {
@@ -472,7 +484,7 @@ int ConfigService::_load(config_service_desc_t &config_desc)
     }
 
     int fd = open(filename, O_RDONLY);
-    
+
     if(fd < 0)
     {
         return errno;
@@ -583,7 +595,7 @@ int ConfigService::get_cfg_cb(CloudServiceStatus status, JSONValue *root, const 
     }
 
     CloudService::instance().sendAck(*root, rval);
-    
+
     return rval;
 }
 
@@ -625,7 +637,7 @@ int ConfigService::set_cfg_cb(CloudServiceStatus status, JSONValue *root, const 
                     auto _rval = _config_process_json(_config, it->root->name(), it->root);
 
                     // want to continue processing all modules and not abort if
-                    // one module fails but still report overall failure if 
+                    // one module fails but still report overall failure if
                     // an earlier module fails so only update the overall rval
                     // on an actual failure code
                     if(_rval)
@@ -841,7 +853,7 @@ int config_write_json(ConfigNode *root, JSONWriter &writer)
                 {
                     writer.beginObject();
                 }
-                
+
                 for(int i=0; i < object_node->child_count(); i++)
                 {
                     auto child = object_node->child(i);
@@ -931,7 +943,7 @@ void _config_hash(ConfigNode *root, murmur3_hash_t &hash)
                 {
                     murmur3_hash_update(hash, root->name(), strlen(root->name()));
                 }
-                
+
                 for(int i=0; i < object_node->child_count(); i++)
                 {
                     auto child = object_node->child(i);

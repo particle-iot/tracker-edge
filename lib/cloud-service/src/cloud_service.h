@@ -193,7 +193,7 @@ class CloudService
         std::list<cloud_service_handler_t> handlers;
         std::list<cloud_service_handler_t> deferred_handlers;
 
-        std::recursive_mutex mutex;
+        RecursiveMutex mutex;
 };
 
 template <typename T>

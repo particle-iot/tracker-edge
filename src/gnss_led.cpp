@@ -21,11 +21,19 @@
 static void GnssLedTimer();
 
 static Timer* timer_ = nullptr;
+static bool enabled = true;
 static LocationStatus lastStatus_ = { .powered = -1, .locked = -1 };
 static int blinkCount_ = GNSS_LED_CONTROL_BLINK_PERIOD_MS / GNSS_LED_CONTROL_TIMER_PERIOD_MS;
 static bool blinkState_ = false;
 
 static void GnssLedTimer() {
+
+    if (!enabled) {
+        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        lastStatus_ = { .powered = -1, .locked = -1 };
+        return;
+    }
+
     LocationStatus status = {0};
     (void)LocationService::instance().getStatus(status);
 
@@ -73,4 +81,11 @@ int GnssLedInit() {
     timer_->start();
 
     return SYSTEM_ERROR_NONE;
+}
+
+void GnssLedEnable(bool enable) {
+    enabled = enable;
+    if (!enabled) {
+        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+    }
 }

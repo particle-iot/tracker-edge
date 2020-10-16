@@ -20,11 +20,20 @@
 #include "cloud_service.h"
 #include "location_service.h"
 #include "motion_service.h"
+#include "tracker_sleep.h"
 
 #define TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC (900)
 #define TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC (3600)
 #define TRACKER_LOCATION_MIN_PUBLISH_DEFAULT (false)
 #define TRACKER_LOCATION_LOCK_TRIGGER (true)
+
+// wait at most this many seconds for a locked GPS location to become stable
+// before publishing regardless
+#define TRACKER_LOCATION_STABLE_WAIT_MAX (30)
+
+// wait at most this many seconds for initial lock on boot before publishing
+// regardless
+#define TRACKER_LOCATION_INITIAL_LOCK_MAX (90)
 
 struct tracker_location_config_t {
     int32_t interval_min_seconds; // 0 = no min
@@ -36,6 +45,26 @@ struct tracker_location_config_t {
 enum class Trigger {
     NORMAL = 0,
     IMMEDIATE = 1,
+};
+
+enum class GnssState {
+    OFF,
+    ERROR,
+    ON_UNLOCKED,
+    ON_LOCKED_UNSTABLE,
+    ON_LOCKED_STABLE,
+};
+
+enum class PublishReason {
+    NONE,
+    TIME,
+    TRIGGERS,
+    IMMEDIATE,
+};
+
+struct EvaluationResults {
+    PublishReason reason;
+    bool networkNeeded;
 };
 
 class TrackerLocation
@@ -74,7 +103,7 @@ class TrackerLocation
         // register for callback on location publish success/fail
         // these callbacks are NOT persistent and are used for the next publish
         int regLocPubCallback(
-            cloud_service_send_cb_t cb, 
+            cloud_service_send_cb_t cb,
             const void *context=nullptr);
 
         template <typename T>
@@ -92,7 +121,16 @@ class TrackerLocation
 
     private:
         TrackerLocation() :
-            location_publish_retry_str(nullptr)
+            _sleep(TrackerSleep::instance()),
+            _loopSampleTick(0),
+            _pending_immediate(false),
+            _first_publish(true),
+            _earlyWake(0),
+            _nextEarlyWake(0),
+            location_publish_retry_str(nullptr),
+            _monotonic_publish_sec(0),
+            _newMonotonic(true),
+            _firstLockSec(0)
         {
             config_state = {
                 .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
@@ -102,11 +140,16 @@ class TrackerLocation
             };
         }
         static TrackerLocation *_instance;
+        TrackerSleep& _sleep;
 
-        std::recursive_mutex mutex;
+        RecursiveMutex mutex;
 
-        Vector<const char *> pending_triggers;
-        bool pending_immediate;
+        Vector<const char *> _pending_triggers;
+        system_tick_t _loopSampleTick = 0;
+        bool _pending_immediate;
+        bool _first_publish;
+        unsigned int _earlyWake;
+        unsigned int _nextEarlyWake;
 
         char *location_publish_retry_str;
 
@@ -121,7 +164,22 @@ class TrackerLocation
 
         void location_publish();
 
-        uint32_t last_location_publish_sec;
+        bool isSleepEnabled();
+        void enableNetworkGnss();
+        void disableGnss();
+        void onSleepPrepare(TrackerSleepContext context);
+        void onSleep(TrackerSleepContext context);
+        void onSleepCancel(TrackerSleepContext context);
+        void onWake(TrackerSleepContext context);
+        void onSleepState(TrackerSleepContext context);
+        EvaluationResults evaluatePublish();
+        void buildPublish(LocationPoint& cur_loc);
+        GnssState loopLocation(LocationPoint& cur_loc);
+
+        uint32_t _last_location_publish_sec;
+        uint32_t _monotonic_publish_sec;
+        bool _newMonotonic;
+        uint32_t _firstLockSec;
 
         tracker_location_config_t config_state, config_state_shadow;
 

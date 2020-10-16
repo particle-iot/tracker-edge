@@ -38,7 +38,7 @@ void CloudService::init()
 void CloudService::tick()
 {
     auto sec = System.uptime();
-    std::lock_guard<std::recursive_mutex> lg(mutex);
+    std::lock_guard<RecursiveMutex> lg(mutex);
 
     if(sec != last_tick_sec)
     {
@@ -90,7 +90,7 @@ void CloudService::tick_sec()
 
 int CloudService::regCommandCallback(const char *cmd, cloud_service_cb_t cb, uint32_t req_id, uint32_t timeout_ms, const void *context)
 {
-    std::lock_guard<std::recursive_mutex> lg(mutex);
+    std::lock_guard<RecursiveMutex> lg(mutex);
     cloud_service_handler_t handler = {CloudServicePublishFlags::NONE, cb, "", req_id, timeout_ms, context, millis()};
 
     if(!cb)
@@ -210,7 +210,7 @@ int CloudService::dispatchCommand(String data)
         return -EINVAL;
     }
  
-    std::lock_guard<std::recursive_mutex> lg(mutex);
+    std::lock_guard<RecursiveMutex> lg(mutex);
     auto it = handlers.begin();
     while(it != handlers.end())
     {
@@ -302,7 +302,7 @@ void CloudService::publish_cb(
     const char *event_data,
     const void *event_context)
 {
-    std::lock_guard<std::recursive_mutex> lg(mutex);
+    std::lock_guard<RecursiveMutex> lg(mutex);
 
     if(!event_context)
     {
@@ -342,7 +342,7 @@ int CloudService::send(const char *event,
 {
     int rval = 0;
     size_t event_len = strlen(event);
-    std::lock_guard<std::recursive_mutex> lg(mutex);
+    std::lock_guard<RecursiveMutex> lg(mutex);
 
     if(!event_name ||
         (!req_id && cb && (cloud_flags & CloudServicePublishFlags::FULL_ACK)))

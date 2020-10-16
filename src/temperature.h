@@ -40,8 +40,11 @@ constexpr double ChargeTempLowLimit = 0.0; // degrees celsius
 // Hysteresis applied to high/low limits to re-enable battery charging
 constexpr double ChargeTempHyst = 2.0; // degrees celsius
 
-// Rate, in seconds, to sample the temperature and evaluate battery charge enablement
-constexpr unsigned int ChargeTickRateSec = 60; // seconds
+// Rate, in seconds, to sample the temperature and evaluate battery charge enablement when awake
+constexpr unsigned int ChargeTickAwakeEvalInterval = 60; // seconds
+
+// Rate, in seconds, to sample the temperature and evaluate battery charge enablement when woken
+constexpr unsigned int ChargeTickSleepEvalInterval = 1; // seconds
 
 /**
  * @brief Get the current temperature

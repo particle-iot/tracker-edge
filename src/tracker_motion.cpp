@@ -16,6 +16,7 @@
 
 #include "tracker_motion.h"
 #include "tracker_location.h"
+#include "tracker_sleep.h"
 
 #include "config_service.h"
 #include "motion_service.h"
@@ -30,9 +31,17 @@ static int get_motion_enabled_cb(int32_t &value, const void *context)
 
 static int set_motion_enabled_cb(int32_t value, const void *context)
 {
-    // TODO: What do we do if this fails to the underlying IMU?
-    // Should we keep retrying at this layer somehow? Return a failure?
-    static_cast<MotionService *>((void *)context)->enableMotionDetection((MotionDetectionMode) value);
+    MotionService *motion_service = static_cast<MotionService *>((void *)context);
+
+    motion_service->enableMotionDetection((MotionDetectionMode) value);
+    if ((MotionDetectionMode)value == MotionDetectionMode::NONE) {
+        if (!motion_service->isAnyAwake()) {
+            TrackerSleep::instance().ignore((pin_t)BMI160_INT_PIN);
+        }
+    }
+    else {
+        TrackerSleep::instance().wakeFor((pin_t)BMI160_INT_PIN, BMI160_INT_MODE);
+    }
     return 0;
 }
 
@@ -49,10 +58,14 @@ static int set_high_g_enabled_cb(int32_t value, const void *context)
     if(value == (int32_t) HighGDetectionMode::DISABLE)
     {
         motion_service->disableHighGDetection();
+        if (!motion_service->isAnyAwake()) {
+            TrackerSleep::instance().ignore((pin_t)BMI160_INT_PIN);
+        }
     }
     else if(value == (int32_t) HighGDetectionMode::ENABLE)
     {
         motion_service->enableHighGDetection();
+        TrackerSleep::instance().wakeFor((pin_t)BMI160_INT_PIN, BMI160_INT_MODE);
     }
     else
     {

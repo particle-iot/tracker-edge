@@ -92,11 +92,7 @@ int MotionService::start(size_t eventDepth) {
     int ret = SYSTEM_ERROR_NONE;
 
     // Retrieve (if first time) instance of the BMI160 IMU device
-#if USE_BMI160_XFACE == BMI160_I2C
-    ret = BMI160.begin(BMI160_I2C_INTERFACE, BMI160_I2C_ADDRESS, BMI160_INT_PIN);
-#elif USE_BMI160_XFACE == BMI160_SPI
     ret = BMI160.begin(BMI160_SPI_INTERFACE, BMI160_SPI_CS_PIN, BMI160_INT_PIN);
-#endif // USE_BMI160_XFACE
     if (ret != SYSTEM_ERROR_NONE) {
         LOG(ERROR, "BMI160.begin() failed");
         return ret;
@@ -151,7 +147,7 @@ int MotionService::enableMotionDetection(MotionDetectionMode mode) {
         case MotionDetectionMode::NONE: {
             CHECK(BMI160.stopMotionDetect());
             clearAwakeFlag(MOTION_AWAKE_SIGANY);
-            if (!isAnyoneAwake()) {
+            if (!isAnyAwake()) {
                 CHECK(BMI160.sleep());
             }
             mode_ = mode;
@@ -179,7 +175,7 @@ int MotionService::enableMotionDetection(MotionDetectionMode mode) {
         }
     }
 
-    if (!isAnyoneAwake()) {
+    if (!isAnyAwake()) {
         CHECK(BMI160.wakeup());
     }
     setAwakeFlag(MOTION_AWAKE_SIGANY);
@@ -199,7 +195,7 @@ MotionDetectionMode MotionService::getMotionDetection() {
 }
 
 int MotionService::enableHighGDetection() {
-    if (!isAnyoneAwake()) {
+    if (!isAnyAwake()) {
         CHECK(BMI160.wakeup());
     }
     setAwakeFlag(MOTION_AWAKE_HIGH_G);
@@ -214,7 +210,7 @@ int MotionService::disableHighGDetection() {
     CHECK(BMI160.stopHighGDetect());
     highGMode_ = HighGDetectionMode::DISABLE;
     clearAwakeFlag(MOTION_AWAKE_HIGH_G);
-    if (!isAnyoneAwake()) {
+    if (!isAnyAwake()) {
         CHECK(BMI160.sleep());
     }
 
@@ -308,6 +304,6 @@ void MotionService::clearAwakeFlag(uint32_t bits) {
     awakeFlags_ &= ~bits;
 }
 
-bool MotionService::isAnyoneAwake() {
+bool MotionService::isAnyAwake() {
     return (awakeFlags_ == MOTION_AWAKE_NONE) ? false : true;
 }

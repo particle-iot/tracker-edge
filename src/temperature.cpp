@@ -17,6 +17,7 @@
 #include <atomic>
 #include "thermistor.h"
 #include "temperature.h"
+#include "tracker_sleep.h"
 
 
 // Configuration based on Panasonic ERTJ1VR104FM NTC thermistor
@@ -78,6 +79,12 @@ enum class TempState {
 static Thermistor _thermistor;
 static TemperatureCallback _enableCharging = nullptr;
 static TemperatureCallback _disableCharging = nullptr;
+static unsigned int chargeEvalTick = 0;
+
+void onWake(TrackerSleepContext context) {
+  // Allow evaluation immediately after wake
+  chargeEvalTick = 0;
+}
 
 float get_temperature() {
   return _thermistor.getTemperature();
@@ -104,6 +111,8 @@ int temperature_init(pin_t analogPin, TemperatureCallback chargeEnable, Temperat
 
   _enableCharging = chargeEnable;
   _disableCharging = chargeDisable;
+
+  void onWake(TrackerSleepContext context);
 
   return SYSTEM_ERROR_NONE;
 }
@@ -221,14 +230,14 @@ void disableCharging(float temperature) {
 }
 
 void evaluate_charge_temperature(float temperature) {
-  static unsigned int tick = 0;
   static TempState chargeTempState = TempState::UNKNOWN;
 
-  if (System.uptime() - tick < ChargeTickRateSec) {
+  unsigned int evalLoopInterval = TrackerSleep::instance().isSleepDisabled() ? ChargeTickAwakeEvalInterval : ChargeTickSleepEvalInterval;
+  if (System.uptime() - chargeEvalTick < evalLoopInterval) {
     return;
   }
 
-  tick = System.uptime();
+  chargeEvalTick = System.uptime();
 
   bool isTempHigh = (temperature >= ChargeTempHighLimit); // Inclusive
   bool isTempBelowHighHyst = (temperature <= (ChargeTempHighLimit - ChargeTempHyst)); // Inclusive

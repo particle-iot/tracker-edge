@@ -219,7 +219,7 @@ private:
     float rateAccel_;
     uint8_t latchShadow_;
     os_queue_t motionSyncQueue_;
-    static std::recursive_mutex mutex_;
+    static RecursiveMutex mutex_;
 }; // class Bmi160
 
 #define BMI160 Bmi160::getInstance()

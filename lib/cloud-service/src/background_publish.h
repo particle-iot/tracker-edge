@@ -73,7 +73,7 @@ class BackgroundPublish
     private:
         Thread *thread = NULL;
         void thread_f();
-        std::recursive_mutex mutex;
+        RecursiveMutex mutex;
         volatile publish_thread_state_t state = BACKGROUND_PUBLISH_IDLE;
 
         // arguments for Particle.publish

@@ -77,6 +77,8 @@ class ConfigService
 
         void resetToFactory();
 
+        void flush();
+
     private:
         ConfigService();
         static ConfigService *_instance;

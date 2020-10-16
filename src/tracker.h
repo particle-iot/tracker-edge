@@ -27,12 +27,14 @@
 #include "motion_service.h"
 #include "AM1805.h"
 
+#include "tracker_sleep.h"
 #include "tracker_location.h"
 #include "tracker_motion.h"
 #include "tracker_shipping.h"
 #include "tracker_rgb.h"
 #include "gnss_led.h"
 #include "temperature.h"
+#include "mcp_can.h"
 
 struct TrackerConfig
 {
@@ -65,7 +67,7 @@ class Tracker
             return *_instance;
         }
 
-        void enterLowBatteryShippingMode();
+        void startLowBatteryShippingMode();
         void init();
         void loop();
         int stop();
@@ -78,9 +80,12 @@ class Tracker
 
         bool isUsbCommandEnabled() { return _config.UsbCommandEnable; }
 
+        void enableWatchdog(bool enable);
+
         // underlying services exposed to allow sharing with rest of the system
         CloudService &cloudService;
         ConfigService &configService;
+        TrackerSleep &sleep;
         LocationService &locationService;
         MotionService &motionService;
 
@@ -109,7 +114,14 @@ class Tracker
         std::mutex _pendingLock;
         TrackerChargeState _chargeStatus;
         unsigned int _lowBatteryEvent;
+        unsigned int _evalChargingTick;
+        bool _batteryChargeEnabled;
 
+        void initIo();
+        void onSleepPrepare(TrackerSleepContext context);
+        void onSleep(TrackerSleepContext context);
+        void onWake(TrackerSleepContext context);
+        void onSleepStateChange(TrackerSleepContext context);
         int registerConfig();
         static void loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context);
         TrackerChargeState batteryDecode(battery_state_t state);
@@ -118,5 +130,6 @@ class Tracker
         static void lowBatteryHandler(system_event_t event, int data);
         static void batteryStateHandler(system_event_t event, int data);
         void initBatteryMonitor();
+        bool getChargeEnabled();
         void evaluateBatteryCharge();
 };

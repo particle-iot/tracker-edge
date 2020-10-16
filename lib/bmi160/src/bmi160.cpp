@@ -58,7 +58,7 @@ int Bmi160::setSpiMode() {
 }
 
 int Bmi160::initialize() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     uint8_t reg = 0;
@@ -101,7 +101,7 @@ int Bmi160::initialize() {
 }
 
 int Bmi160::cleanup() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     // Disable interrupts, set defaults
@@ -115,7 +115,7 @@ int Bmi160::cleanup() {
 }
 
 int Bmi160::begin(const TwoWire* interface, uint8_t address, pin_t interruptPin, size_t eventDepth) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_FALSE(initialized_, SYSTEM_ERROR_NONE);
     CHECK_TRUE(interface, SYSTEM_ERROR_INVALID_ARGUMENT);
 
@@ -147,7 +147,7 @@ int Bmi160::begin(const TwoWire* interface, uint8_t address, pin_t interruptPin,
 }
 
 int Bmi160::begin(const SPIClass& interface, pin_t selectPin, pin_t interruptPin, size_t eventDepth) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_FALSE(initialized_, SYSTEM_ERROR_NONE);
 
     if (os_queue_create(&motionSyncQueue_, sizeof(Bmi160EventType), eventDepth, nullptr)) {
@@ -173,7 +173,7 @@ int Bmi160::begin(const SPIClass& interface, pin_t selectPin, pin_t interruptPin
 }
 
 int Bmi160::end() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_NONE);
 
     cleanup();
@@ -189,7 +189,7 @@ int Bmi160::end() {
 }
 
 int Bmi160::reset() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     if (type_ == InterfaceType::BMI_SPI) {
         CHECK(setSpiMode());
@@ -207,7 +207,7 @@ int Bmi160::reset() {
 }
 
 int Bmi160::sleep() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_SUSPEND));
     delay(BMI160_ACC_PMU_CMD_TIME);
@@ -216,7 +216,7 @@ int Bmi160::sleep() {
 }
 
 int Bmi160::wakeup() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     CHECK(writeRegister(Bmi160Register::CMD_ADDR, Bmi160Command::CMD_ACC_PMU_MODE_LOW));
     delay(BMI160_ACC_PMU_CMD_TIME);
@@ -489,7 +489,7 @@ int Bmi160::setAccelHighGHysteresis(float& hysteresis, bool feedback) {
 }
 
 int Bmi160::initAccelerometer(Bmi160AccelerometerConfig& config, bool feedback) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     // Setting maximum range
@@ -502,7 +502,7 @@ int Bmi160::initAccelerometer(Bmi160AccelerometerConfig& config, bool feedback) 
 }
 
 int Bmi160::getAccelerometer(Bmi160Accelerometer& data) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     uint8_t buffer[6];
@@ -518,7 +518,7 @@ int Bmi160::getAccelerometer(Bmi160Accelerometer& data) {
 }
 
 int Bmi160::getAccelerometerPmu(Bmi160PowerState& pmu) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     uint8_t val = 0;
     CHECK(readRegister(Bmi160Register::PMU_STATUS_ADDR, &val));
@@ -548,7 +548,7 @@ int Bmi160::getAccelerometerPmu(Bmi160PowerState& pmu) {
 }
 
 int Bmi160::startMotionDetect() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     uint8_t reg = 0;
@@ -562,7 +562,7 @@ int Bmi160::startMotionDetect() {
 }
 
 int Bmi160::stopMotionDetect() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     uint8_t reg = 0;
@@ -576,7 +576,7 @@ int Bmi160::stopMotionDetect() {
 }
 
 int Bmi160::initMotion(Bmi160AccelMotionConfig& config, bool feedback) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     // Setting motion threshold
@@ -602,7 +602,7 @@ int Bmi160::initMotion(Bmi160AccelMotionConfig& config, bool feedback) {
 }
 
 int Bmi160::initHighG(Bmi160AccelHighGConfig& config, bool feedback) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     // Setting high G threshold
@@ -618,7 +618,7 @@ int Bmi160::initHighG(Bmi160AccelHighGConfig& config, bool feedback) {
 }
 
 int Bmi160::startHighGDetect() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     uint8_t reg = 0;
@@ -632,7 +632,7 @@ int Bmi160::startHighGDetect() {
 }
 
 int Bmi160::stopHighGDetect() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
 
     uint8_t reg = 0;
@@ -646,7 +646,7 @@ int Bmi160::stopHighGDetect() {
 }
 
 int Bmi160::getStatus(uint32_t& val, bool clear) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     CHECK(readRegister(Bmi160Register::INT_STATUS_0_ADDR, reinterpret_cast<uint8_t*>(&val), sizeof(val)));
 
@@ -669,7 +669,7 @@ bool Bmi160::isHighGDetect(uint32_t val) {
 }
 
 int Bmi160::getChipId(uint8_t& val) {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const std::lock_guard<RecursiveMutex> lock(mutex_);
     CHECK_TRUE(initialized_, SYSTEM_ERROR_INVALID_STATE);
     return readRegister(Bmi160Register::CHIPID_ADDR, &val);
 }
@@ -758,4 +758,4 @@ int Bmi160::readRegister(uint8_t reg, uint8_t* val, int length) {
     return SYSTEM_ERROR_INVALID_STATE;
 }
 
-std::recursive_mutex Bmi160::mutex_;
+RecursiveMutex Bmi160::mutex_;

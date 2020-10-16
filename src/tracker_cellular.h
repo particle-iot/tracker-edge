@@ -51,7 +51,7 @@ class TrackerCellular
         CellularSignal _signal;
         unsigned int _signal_update;
 
-        std::recursive_mutex mutex;
+        RecursiveMutex mutex;
         Thread * thread;
 
         void thread_f();

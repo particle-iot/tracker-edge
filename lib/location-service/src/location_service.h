@@ -40,6 +40,8 @@ enum class LocationTimescale {
  */
 struct LocationPoint {
     int locked;                     /**< Indication of GNSS locked status */
+    unsigned int lockedDuration;    /**< Duration of the current GNSS lock (if applicable) */
+    bool stable;                    /**< Indication if GNNS lock is stable (if applicable) */
     time_t epochTime;               /**< Epoch time from device sources */
     LocationTimescale timeScale;    /**< Epoch timescale */
     float latitude;                 /**< Point latitude in degrees */
@@ -226,7 +228,7 @@ private:
      */
     int getWayPoint(PointThreshold& point);
 
-    std::recursive_mutex pointMutex_;
+    RecursiveMutex pointMutex_;
     uint16_t selectPin_;
     uint16_t enablePin_;
     ubloxGPS* gps_;

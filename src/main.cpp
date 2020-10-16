@@ -35,8 +35,6 @@ SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
 void setup()
 {
     Tracker::instance().init();
-
-    Particle.connect();
 }
 
 void loop()

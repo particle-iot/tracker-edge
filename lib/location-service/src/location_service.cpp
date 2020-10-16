@@ -98,6 +98,8 @@ int LocationService::stop() {
 int LocationService::getLocation(LocationPoint& point) {
     WITH_LOCK(*gps_) {
         point.locked = (gps_->getLock()) ? 1 : 0;
+        point.stable = gps_->isLockStable();
+        point.lockedDuration = gps_->getLockDuration();
         point.epochTime = (time_t)gps_->getUTCTime();
         point.timeScale = LocationTimescale::TIMESCALE_UTC;
         if (point.locked) {
@@ -115,19 +117,19 @@ int LocationService::getLocation(LocationPoint& point) {
 }
 
 int LocationService::getRadiusThreshold(float& radius) {
-    const std::lock_guard<std::recursive_mutex> lock(pointMutex_);
+    const std::lock_guard<RecursiveMutex> lock(pointMutex_);
     radius = pointThreshold_.radius;
     return SYSTEM_ERROR_NONE;
 }
 
 int LocationService::setRadiusThreshold(float radius) {
-    const std::lock_guard<std::recursive_mutex> lock(pointMutex_);
+    const std::lock_guard<RecursiveMutex> lock(pointMutex_);
     pointThreshold_.radius = std::fabs(radius);
     return SYSTEM_ERROR_NONE;
 }
 
 int LocationService::getWayPoint(float& latitude, float& longitude) {
-    const std::lock_guard<std::recursive_mutex> lock(pointMutex_);
+    const std::lock_guard<RecursiveMutex> lock(pointMutex_);
     CHECK_TRUE(pointThresholdConfigured_, SYSTEM_ERROR_INVALID_STATE);
     latitude = pointThreshold_.latitude;
     longitude = pointThreshold_.longitude;
@@ -135,7 +137,7 @@ int LocationService::getWayPoint(float& latitude, float& longitude) {
 }
 
 int LocationService::setWayPoint(float latitude, float longitude) {
-    const std::lock_guard<std::recursive_mutex> lock(pointMutex_);
+    const std::lock_guard<RecursiveMutex> lock(pointMutex_);
     pointThreshold_.latitude = latitude;
     pointThreshold_.longitude = longitude;
     pointThresholdConfigured_ = true;
@@ -143,7 +145,7 @@ int LocationService::setWayPoint(float latitude, float longitude) {
 }
 
 int LocationService::getWayPoint(PointThreshold& point) {
-    const std::lock_guard<std::recursive_mutex> lock(pointMutex_);
+    const std::lock_guard<RecursiveMutex> lock(pointMutex_);
     CHECK_TRUE(pointThresholdConfigured_, SYSTEM_ERROR_INVALID_STATE);
     point = pointThreshold_;
     return SYSTEM_ERROR_NONE;

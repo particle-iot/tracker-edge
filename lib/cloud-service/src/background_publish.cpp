@@ -112,7 +112,7 @@ void BackgroundPublish::thread_f()
 bool BackgroundPublish::publish(const char *name, const char *data, PublishFlags flags, publish_completed_cb_t cb, const void *context)
 {
     // protect against separate threads trying to publish at the same time
-    std::lock_guard<std::recursive_mutex> lg(mutex);
+    std::lock_guard<RecursiveMutex> lg(mutex);
 
     // check currently in idle state and ready to accept publish request
     if(!thread || state != BACKGROUND_PUBLISH_IDLE)
