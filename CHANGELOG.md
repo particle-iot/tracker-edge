@@ -1,3 +1,25 @@
+## v10
+
+### COMPATIBILTY
+
+Must be built using device OS v2.0.0-rc.3 or greater.
+
+### FEATURES
+
+- Added sleep feature to place device into ultra low power mode sleep and wake periodically for timed and triggered events.
+
+### ENHANCEMENTS
+
+- Improved GPS lock status with a stability check of horizontal accuracy.  Location publishes will be held off until the accuracy is stable.
+- Placed CAN and ESP32 devices into low power mode to reduce overall power consumption
+- Enabled the RTC watchdog by default
+- [TRACKER ONE] Lowered low battery detect shutoff from 8% state-of-charge to 2% to gain more operational time.  Lowered battery warning from 15% to 8%.
+
+### BUGFIXES
+
+- [TRACKER ONE] Fixed intermittent issues with battery charge enablement/disablement when lower than 0 degrees C and above 50 degrees C
+
+
 ## v9
 
 ### FEATURES
