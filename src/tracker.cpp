@@ -138,7 +138,7 @@ void Tracker::initIo()
         Log.error("CAN init failed");
     }
     Log.info("CAN status: 0x%x", can.getCANStatus());
-    if (can.setMode(MODE_NORMAL)) {
+    if (can.setMode(MCP_MODE_NORMAL)) {
         Log.error("CAN mode to NORMAL failed");
     }
     else {
@@ -151,13 +151,13 @@ void Tracker::initIo()
     digitalWrite(MCP_CAN_PWR_EN_PIN, LOW); // The CAN 5V power supply will now be disabled
 
     for (int retries = CanSleepRetries; retries >= 0; retries--) {
-        auto stat = can.getCANStatus() & MODE_MASK;
-        if (stat == MODE_SLEEP) {
+        auto stat = can.getCANStatus() & MCP_MODE_MASK;
+        if (stat == MCP_MODE_SLEEP) {
             Log.info("CAN mode to SLEEP");
             break;
         }
         // Retry setting the sleep mode
-        if (can.setMode(MODE_SLEEP)) {
+        if (can.setMode(MCP_MODE_SLEEP)) {
             Log.error("CAN mode not set to SLEEP");
         }
         delay(10);
