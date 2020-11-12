@@ -28,6 +28,7 @@ TrackerLocation *TrackerLocation::_instance = nullptr;
 static constexpr system_tick_t LoopSampleRate = 1000; // milliseconds
 static constexpr uint32_t EarlySleepSec = 2; // seconds
 static constexpr uint32_t MiscSleepWakeSec = 3; // seconds - miscellaneous time spent by system entering and exiting sleep
+static constexpr int32_t LockTimeoutSec = 10; // seconds - time to wait for GNSS lock (sleep disabled)
 
 static int set_radius_cb(double value, const void *context)
 {
@@ -288,6 +289,7 @@ void TrackerLocation::location_publish()
 void TrackerLocation::enableNetworkGnss() {
     LocationService::instance().start();
     _sleep.forceFullWakeCycle();
+    _gnssStartedSec = System.uptime();
 }
 
 void TrackerLocation::disableGnss() {
@@ -299,19 +301,22 @@ bool TrackerLocation::isSleepEnabled() {
 }
 
 EvaluationResults TrackerLocation::evaluatePublish() {
-    // This will allow a trigger publish on boot
+    auto now = System.uptime();
+
+    // This will allow a trigger publish on boot.
+    // This may be pre-emptively published due to connect and execute times if sleep is enabled.
+    // If sleep is disabled then timeout after some time.
     if (_first_publish) {
         Log.trace("%s first", __FUNCTION__);
-        return EvaluationResults {PublishReason::TRIGGERS, true};
+        return EvaluationResults {PublishReason::TRIGGERS, true, (now - _gnssStartedSec) < (uint32_t)_sleep.getConfigConnectingTime()};
     }
 
     if (_pending_immediate) {
         // request for immediate publish overrides the default min/max interval checking
         Log.trace("%s pending_immediate", __FUNCTION__);
-        return EvaluationResults {PublishReason::IMMEDIATE, true};
+        return EvaluationResults {PublishReason::IMMEDIATE, true, 0};
     }
 
-    auto now = System.uptime();
     uint32_t interval = now - _last_location_publish_sec;
     uint32_t maxInterval = now - _monotonic_publish_sec;
 
@@ -332,7 +337,8 @@ EvaluationResults TrackerLocation::evaluatePublish() {
         if (maxInterval >= max) {
             // max interval and past the max interval so have to publish
             Log.trace("%s max", __FUNCTION__);
-            return EvaluationResults {PublishReason::TIME, true};
+            // timeout may be pre-empted when sleep enabled
+            return EvaluationResults {PublishReason::TIME, true, (maxInterval - max) < LockTimeoutSec};
         }
     }
 
@@ -354,11 +360,12 @@ EvaluationResults TrackerLocation::evaluatePublish() {
             (interval >= min)) {
             // no min interval or past the min interval so can publish
             Log.trace("%s min", __FUNCTION__);
-            return EvaluationResults {PublishReason::TRIGGERS, true};
+            // timeout may be pre-empted when sleep enabled
+            return EvaluationResults {PublishReason::TRIGGERS, true, (interval - min) < LockTimeoutSec};
         }
     }
 
-    return EvaluationResults {PublishReason::NONE, networkNeeded};
+    return EvaluationResults {PublishReason::NONE, networkNeeded, 0};
 }
 
 // The purpose of thhe sleep prepare callback is to allow each task to calculate
@@ -632,6 +639,12 @@ void TrackerLocation::loop() {
                 case GnssState::ON_UNLOCKED:
                 // fall through
                 case GnssState::ON_LOCKED_UNSTABLE: {
+                    if (!publishReason.lockWait) {
+                        Log.trace("publishing from max interval after waiting");
+                        triggerLocPub(Trigger::NORMAL,"time");
+                        publishNow = true;
+                        break;
+                    }
                     Log.trace("waiting for stable GNSS lock for max interval");
                     break;
                 }
@@ -653,6 +666,12 @@ void TrackerLocation::loop() {
                 case GnssState::ON_UNLOCKED:
                 // fall through
                 case GnssState::ON_LOCKED_UNSTABLE: {
+                    if (!publishReason.lockWait) {
+                        Log.trace("publishing from triggers after waiting");
+                        publishNow = true;
+                        _newMonotonic = true;
+                        break;
+                    }
                     Log.trace("waiting for stable GNSS lock for triggers");
                     break;
                 }
@@ -693,6 +712,7 @@ void TrackerLocation::loop() {
         if (_first_publish || _newMonotonic)
         {
             _monotonic_publish_sec = _last_location_publish_sec;
+            _newMonotonic = false;
         }
         else
         {

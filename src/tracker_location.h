@@ -65,6 +65,7 @@ enum class PublishReason {
 struct EvaluationResults {
     PublishReason reason;
     bool networkNeeded;
+    bool lockWait;
 };
 
 class TrackerLocation
@@ -130,7 +131,8 @@ class TrackerLocation
             location_publish_retry_str(nullptr),
             _monotonic_publish_sec(0),
             _newMonotonic(true),
-            _firstLockSec(0)
+            _firstLockSec(0),
+            _gnssStartedSec(0)
         {
             config_state = {
                 .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
@@ -180,6 +182,7 @@ class TrackerLocation
         uint32_t _monotonic_publish_sec;
         bool _newMonotonic;
         uint32_t _firstLockSec;
+        uint32_t _gnssStartedSec;
 
         tracker_location_config_t config_state, config_state_shadow;
 
