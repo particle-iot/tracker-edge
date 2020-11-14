@@ -26,6 +26,7 @@
 #define TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC (3600)
 #define TRACKER_LOCATION_MIN_PUBLISH_DEFAULT (false)
 #define TRACKER_LOCATION_LOCK_TRIGGER (true)
+#define TRACKER_LOCATION_PROCESS_ACK (true)
 
 // wait at most this many seconds for a locked GPS location to become stable
 // before publishing regardless
@@ -40,6 +41,7 @@ struct tracker_location_config_t {
     int32_t interval_max_seconds; // 0 = no max
     bool min_publish;
     bool lock_trigger;
+    bool process_ack;
 };
 
 enum class Trigger {
@@ -138,7 +140,8 @@ class TrackerLocation
                 .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
                 .interval_max_seconds = TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC,
                 .min_publish = TRACKER_LOCATION_MIN_PUBLISH_DEFAULT,
-                .lock_trigger = TRACKER_LOCATION_LOCK_TRIGGER
+                .lock_trigger = TRACKER_LOCATION_LOCK_TRIGGER,
+                .process_ack = TRACKER_LOCATION_PROCESS_ACK
             };
         }
         static TrackerLocation *_instance;

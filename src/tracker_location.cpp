@@ -28,7 +28,7 @@ TrackerLocation *TrackerLocation::_instance = nullptr;
 static constexpr system_tick_t LoopSampleRate = 1000; // milliseconds
 static constexpr uint32_t EarlySleepSec = 2; // seconds
 static constexpr uint32_t MiscSleepWakeSec = 3; // seconds - miscellaneous time spent by system entering and exiting sleep
-static constexpr int32_t LockTimeoutSec = 10; // seconds - time to wait for GNSS lock (sleep disabled)
+static constexpr uint32_t LockTimeoutSec = 10; // seconds - time to wait for GNSS lock (sleep disabled)
 
 static int set_radius_cb(double value, const void *context)
 {
@@ -100,7 +100,10 @@ void TrackerLocation::init()
                 &config_state.min_publish, &config_state_shadow.min_publish),
             ConfigBool("lock_trigger",
                 config_get_bool_cb, config_set_bool_cb,
-                &config_state.lock_trigger, &config_state_shadow.lock_trigger)
+                &config_state.lock_trigger, &config_state_shadow.lock_trigger),
+            ConfigBool("loc_ack",
+                config_get_bool_cb, config_set_bool_cb,
+                &config_state.process_ack, &config_state_shadow.process_ack)
         },
         std::bind(&TrackerLocation::enter_location_config_cb, this, _1, _2),
         std::bind(&TrackerLocation::exit_location_config_cb, this, _1, _2, _3)
@@ -230,12 +233,15 @@ void TrackerLocation::location_publish()
     // the finalized loc publish to retry on failure
     cloud_service.lock();
 
+    CloudServicePublishFlags cloud_flags =
+        (config_state.process_ack) ? CloudServicePublishFlags::FULL_ACK : CloudServicePublishFlags::NONE;
+
     if(location_publish_retry_str)
     {
         // publish a retry loc
         rval = cloud_service.send(location_publish_retry_str,
             WITH_ACK,
-            CloudServicePublishFlags::FULL_ACK,
+            cloud_flags,
             &TrackerLocation::location_publish_cb, this,
             CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
     }
@@ -243,7 +249,7 @@ void TrackerLocation::location_publish()
     {
         // publish a new loc (contained in cloud_service buffer)
         rval = cloud_service.send(WITH_ACK,
-            CloudServicePublishFlags::FULL_ACK,
+            cloud_flags,
             &TrackerLocation::location_publish_cb, this,
             CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
     }
@@ -314,7 +320,7 @@ EvaluationResults TrackerLocation::evaluatePublish() {
     if (_pending_immediate) {
         // request for immediate publish overrides the default min/max interval checking
         Log.trace("%s pending_immediate", __FUNCTION__);
-        return EvaluationResults {PublishReason::IMMEDIATE, true, 0};
+        return EvaluationResults {PublishReason::IMMEDIATE, true, false};
     }
 
     uint32_t interval = now - _last_location_publish_sec;
@@ -365,7 +371,7 @@ EvaluationResults TrackerLocation::evaluatePublish() {
         }
     }
 
-    return EvaluationResults {PublishReason::NONE, networkNeeded, 0};
+    return EvaluationResults {PublishReason::NONE, networkNeeded, false};
 }
 
 // The purpose of thhe sleep prepare callback is to allow each task to calculate
