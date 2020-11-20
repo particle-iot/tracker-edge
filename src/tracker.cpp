@@ -448,9 +448,10 @@ void Tracker::init()
 	// Initialize unused interfaces and pins
     initIo();
 
-    // Reset the fuel gauge state-of-charge, check if under thresholds
+    // Perform IO setup specific to Tracker One.  Reset the fuel gauge state-of-charge, check if under thresholds.
     if (_model == TRACKER_MODEL_TRACKERONE)
     {
+        BLE.selectAntenna(BleAntennaType::EXTERNAL);
         initBatteryMonitor();
     }
 
