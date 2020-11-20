@@ -1,3 +1,24 @@
+## v11
+
+### COMPATIBILTY
+
+Must be built using device OS v2.0.0-rc.3 or greater.
+
+### FEATURES
+
+- Added configurable setting to enable or disable parsing of location publish acknowledgements from the cloud.
+
+### ENHANCEMENTS
+
+- Changed CAN library enumerations for setting power modes so they do not collide with symbols in other device driver libraries.
+- Changed CAN library so that cloud compiles are possible.
+
+### BUGFIXES
+
+- Fixed issue of no location publishes when GNSS signal quality is low and out-of-lock.
+- [TRACKER ONE] Changed BLE antenna configuration from internal to external.
+
+
 ## v10
 
 ### COMPATIBILTY
