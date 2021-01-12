@@ -562,6 +562,7 @@ void TrackerLocation::buildPublish(LocationPoint& cur_loc) {
         {
             cloud_service.writer().name("alt").value(cur_loc.altitude, 3);
             cloud_service.writer().name("hd").value(cur_loc.heading, 2);
+            cloud_service.writer().name("spd").value(cur_loc.speed, 2);
             cloud_service.writer().name("h_acc").value(cur_loc.horizontalAccuracy, 3);
             cloud_service.writer().name("v_acc").value(cur_loc.verticalAccuracy, 3);
         }
