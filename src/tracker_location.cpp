@@ -309,18 +309,18 @@ bool TrackerLocation::isSleepEnabled() {
 EvaluationResults TrackerLocation::evaluatePublish() {
     auto now = System.uptime();
 
+    if (_pending_immediate) {
+        // request for immediate publish overrides the default min/max interval checking
+        Log.trace("%s pending_immediate", __FUNCTION__);
+        return EvaluationResults {PublishReason::IMMEDIATE, true, false};
+    }
+
     // This will allow a trigger publish on boot.
     // This may be pre-emptively published due to connect and execute times if sleep is enabled.
     // If sleep is disabled then timeout after some time.
     if (_first_publish) {
         Log.trace("%s first", __FUNCTION__);
         return EvaluationResults {PublishReason::TRIGGERS, true, (now - _gnssStartedSec) < (uint32_t)_sleep.getConfigConnectingTime()};
-    }
-
-    if (_pending_immediate) {
-        // request for immediate publish overrides the default min/max interval checking
-        Log.trace("%s pending_immediate", __FUNCTION__);
-        return EvaluationResults {PublishReason::IMMEDIATE, true, false};
     }
 
     uint32_t interval = now - _last_location_publish_sec;
