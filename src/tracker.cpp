@@ -442,9 +442,6 @@ void Tracker::init()
 #endif // TRACKER_MODEL_VARIANT
 #endif // TRACKER_MODEL_NUMBER
 
-    // PIN_INVALID to disable unnecessary config of a default CS pin
-    SPI.begin(PIN_INVALID);
-
 	// Initialize unused interfaces and pins
     initIo();
 
