@@ -78,6 +78,7 @@ class Tracker
 
         int enableCharging();
         int disableCharging();
+        int setChargeCurrent(uint16_t current);
 
         bool isUsbCommandEnabled() { return _config.UsbCommandEnable; }
 
@@ -98,6 +99,8 @@ class Tracker
         TrackerRGB &rgb;
     private:
         Tracker();
+
+        int chargeCallback(TemperatureChargeEvent event);
 
         static Tracker* _instance;
         TrackerConfig _config;

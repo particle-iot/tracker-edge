@@ -35,6 +35,9 @@ constexpr unsigned int TrackerLowBatteryStartTime = 20; // seconds to debounce l
 constexpr unsigned int TrackerLowBatteryDebounceTime = 5; // seconds to debounce low battery condition
 constexpr unsigned int TrackerChargingAwakeEvalTime = 10; // seconds to sample the PMIC charging state
 constexpr unsigned int TrackerChargingSleepEvalTime = 1; // seconds to sample the PMIC charging state
+constexpr uint16_t TrackerChargeCurrentHigh = 1024; // milliamps
+constexpr uint16_t TrackerChargeCurrentLow = 512; // milliamps
+constexpr uint16_t TrackerInputCurrent = 1500; // milliamps
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -290,6 +293,13 @@ void Tracker::batteryStateHandler(system_event_t event, int data) {
 
 
 void Tracker::initBatteryMonitor() {
+    SystemPowerConfiguration powerConfig;
+    // Start battery charging at low current state from boot then increase if nescessary
+    powerConfig.batteryChargeCurrent(TrackerChargeCurrentLow);
+    powerConfig.powerSourceMaxCurrent(TrackerInputCurrent);
+    auto ret = System.setPowerConfiguration(powerConfig);
+    Log.trace("tracker setPowerConfiguration = %d", ret);
+
     // To initialize the fuel gauge so that it provides semi-accurate readings we
     // want to ensure that the charging circuit is off when providing the
     // fuel gauge quick start command.
@@ -491,7 +501,7 @@ void Tracker::init()
 #endif // TRACKER_MODEL_VARIANT
 #endif // TRACKER_MODEL_NUMBER
 
-	// Initialize unused interfaces and pins
+    // Initialize unused interfaces and pins
     initIo();
 
     // Perform IO setup specific to Tracker One.  Reset the fuel gauge state-of-charge, check if under thresholds.
@@ -531,8 +541,7 @@ void Tracker::init()
     {
         (void)GnssLedInit();
         temperature_init(TRACKER_THERMISTOR,
-            [this](){ return enableCharging();},
-            [this](){ return disableCharging();}
+            [this](TemperatureChargeEvent event){ return chargeCallback(event); }
         );
     }
 
@@ -618,6 +627,43 @@ int Tracker::disableCharging() {
     PMIC pmic(true);
     _batteryChargeEnabled = false;
     return (pmic.disableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
+}
+
+int Tracker::setChargeCurrent(uint16_t current) {
+    SystemPowerConfiguration powerConfig;
+    powerConfig.batteryChargeCurrent(current);
+    auto ret = System.setPowerConfiguration(powerConfig);
+    return (ret) ?  SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
+}
+
+int Tracker::chargeCallback(TemperatureChargeEvent event) {
+    switch (event) {
+        case TemperatureChargeEvent::NORMAL: {
+            setChargeCurrent(TrackerChargeCurrentHigh);
+            enableCharging();
+            break;
+        }
+
+        case TemperatureChargeEvent::OVER_CHARGE_REDUCTION: {
+            setChargeCurrent(TrackerChargeCurrentLow);
+            enableCharging();
+            break;
+        }
+
+        case TemperatureChargeEvent::OVER_TEMPERATURE: {
+            setChargeCurrent(TrackerChargeCurrentLow);
+            disableCharging();
+            break;
+        }
+
+        case TemperatureChargeEvent::UNDER_TEMPERATURE: {
+            setChargeCurrent(TrackerChargeCurrentLow);
+            disableCharging();
+            break;
+        }
+    }
+
+    return SYSTEM_ERROR_NONE;
 }
 
 void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context)

@@ -20,7 +20,15 @@
 #include "tracker_config.h"
 #include "config_service.h"
 
-using TemperatureCallback = std::function<int(void)>;
+enum class TemperatureChargeEvent {
+  NORMAL,                 //< Normal temperature condition
+  OVER_TEMPERATURE,       //< Over temperature condition
+  UNDER_TEMPERATURE,      //< Under temperature condition
+  OVER_CHARGE_REDUCTION,  //< Over temperature for reduced charge condition
+};
+
+using TemperatureCallback = std::function<int(TemperatureChargeEvent)>;
+
 
 // Default temperature high threshold.
 constexpr double TemperatureHighDefault = 25.0; // degrees celsius
@@ -32,16 +40,19 @@ constexpr double TemperatureLowDefault = 25.0; // degrees celsius
 constexpr double TemperatureHysteresisDefault = 5.0; // degrees celsius
 
 // High limit to disable battery charging (inclusive)
-constexpr double ChargeTempHighLimit = 50.0; // degrees celsius
+constexpr double ChargeTempHighLimit = 54.0; // degrees celsius
 
 // Low limit to disable battery charging (inclusive)
 constexpr double ChargeTempLowLimit = 0.0; // degrees celsius
+
+// High limit to reduce battery charging current (inclusive)
+constexpr double ChargeTempReducedALimit = 40.0; // degrees celsius
 
 // Hysteresis applied to high/low limits to re-enable battery charging
 constexpr double ChargeTempHyst = 2.0; // degrees celsius
 
 // Rate, in seconds, to sample the temperature and evaluate battery charge enablement when awake
-constexpr unsigned int ChargeTickAwakeEvalInterval = 60; // seconds
+constexpr unsigned int ChargeTickAwakeEvalInterval = 30; // seconds
 
 // Rate, in seconds, to sample the temperature and evaluate battery charge enablement when woken
 constexpr unsigned int ChargeTickSleepEvalInterval = 1; // seconds
@@ -75,7 +86,7 @@ size_t temperature_low_events();
  * @retval SYSTEM_ERROR_NONE
  * @retval SYSTEM_ERROR_INVALID_ARGUMENT
  */
-int temperature_init(pin_t analogPin, TemperatureCallback chargeEnable, TemperatureCallback chargeDisable);
+int temperature_init(pin_t analogPin, TemperatureCallback eventCallback);
 
 /**
  * @brief Process the temperature loop tick.
