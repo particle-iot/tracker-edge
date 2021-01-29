@@ -223,13 +223,13 @@ TrackerChargeState Tracker::batteryDecode(battery_state_t state) {
 }
 
 void Tracker::setPendingChargeStatus(unsigned int uptime, TrackerChargeState state) {
-    const std::lock_guard<std::mutex> lock(_pendingLock);
+    const std::lock_guard<Mutex> lock(_pendingLock);
     _pendingChargeStatus.uptime = uptime;
     _pendingChargeStatus.state = state;
 }
 
 TrackerChargeStatus Tracker::getPendingChargeStatus() {
-    const std::lock_guard<std::mutex> lock(_pendingLock);
+    const std::lock_guard<Mutex> lock(_pendingLock);
     return _pendingChargeStatus;
 }
 

@@ -111,7 +111,7 @@ class Tracker
         bool _delayedBatteryCheck;
         unsigned int _delayedBatteryCheckTick;
         TrackerChargeStatus _pendingChargeStatus;
-        std::mutex _pendingLock;
+        Mutex _pendingLock;
         TrackerChargeState _chargeStatus;
         unsigned int _lowBatteryEvent;
         unsigned int _evalChargingTick;
