@@ -25,6 +25,11 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 PRODUCT_ID(TRACKER_PRODUCT_ID);
 PRODUCT_VERSION(TRACKER_PRODUCT_VERSION);
 
+STARTUP(
+    // Correct power manager states in the DCT
+    Tracker::enablePowerManagement();
+);
+
 SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
     { "app.gps.nmea", LOG_LEVEL_INFO },
     { "app.gps.ubx",  LOG_LEVEL_INFO },

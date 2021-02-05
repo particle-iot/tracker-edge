@@ -68,6 +68,7 @@ class Tracker
         }
 
         void startLowBatteryShippingMode();
+        static int enablePowerManagement();
         void init();
         void loop();
         int stop();
@@ -117,6 +118,8 @@ class Tracker
         unsigned int _evalChargingTick;
         bool _batteryChargeEnabled;
 
+        static int getPowerManagementConfig(hal_power_config& conf);
+        static int setPowerManagementConfig(const hal_power_config& conf);
         void initIo();
         void onSleepPrepare(TrackerSleepContext context);
         void onSleep(TrackerSleepContext context);

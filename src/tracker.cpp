@@ -98,6 +98,55 @@ int Tracker::registerConfig()
     return 0;
 }
 
+int Tracker::getPowerManagementConfig(hal_power_config& conf) {
+    conf.size = sizeof(conf); // Size is provided for backwards compatibility
+    auto err = dct_read_app_data_copy(DCT_POWER_CONFIG_OFFSET, &conf, conf.size);
+    if (err) {
+        return SYSTEM_ERROR_IO; // Read error
+    }
+
+    // Check if table contents are valid
+    if ((conf.version == 0xff) || (conf.size == 0x00) || (conf.size == 0xff)) {
+        return SYSTEM_ERROR_INVALID_STATE;
+    }
+
+    // Invert first byte of the flags to keep compatibility for HAL_POWER_PMIC_DETECTION flag
+    uint32_t inverted = (~conf.flags) & 0x000000ff;
+    conf.flags &= 0xffffff00;
+    conf.flags |= inverted;
+
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::setPowerManagementConfig(const hal_power_config& conf) {
+    return system_power_management_set_config(&conf, nullptr);
+}
+
+int Tracker::enablePowerManagement() {
+    // Gather power management configuration data that has been saved away to the DCT
+    // and ensure the power managemen disable flag is clear without affecting any
+    // other settings.  This will be performed inside of the device OS on later
+    // versions.
+
+    hal_power_config conf = {};
+    auto err = getPowerManagementConfig(conf);
+
+    if (err) {
+        return err;
+    }
+
+    // Clear the disable flag if set but keep everything else
+    if ((conf.flags & HAL_POWER_MANAGEMENT_DISABLE) == 0) {
+        return SYSTEM_ERROR_NONE;
+    }
+
+    conf.flags &= ~HAL_POWER_MANAGEMENT_DISABLE;
+
+    err = setPowerManagementConfig(conf);
+
+    return err;
+}
+
 void Tracker::initIo()
 {
     // Initialize basic Tracker GPIO to known inactive values until they are needed later
