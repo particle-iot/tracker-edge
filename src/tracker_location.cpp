@@ -186,6 +186,7 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
         // end-to-end ACK
         Log.info("location cb publish %lu success!", *(uint32_t *) context);
         _first_publish = false;
+        _pending_first_publish = false;
     }
     else if(status == CloudServiceStatus::FAILURE)
     {
@@ -318,7 +319,7 @@ EvaluationResults TrackerLocation::evaluatePublish() {
     // This will allow a trigger publish on boot.
     // This may be pre-emptively published due to connect and execute times if sleep is enabled.
     // If sleep is disabled then timeout after some time.
-    if (_first_publish) {
+    if (_first_publish && !_pending_first_publish) {
         Log.trace("%s first", __FUNCTION__);
         return EvaluationResults {PublishReason::TRIGGERS, true, (now - _gnssStartedSec) < (uint32_t)_sleep.getConfigConnectingTime()};
     }
@@ -700,7 +701,7 @@ void TrackerLocation::loop() {
     //
 
     // then of any new publish
-    if(publishNow)
+    if(publishNow && Particle.connected())
     {
         if(location_publish_retry_str)
         {
@@ -716,7 +717,7 @@ void TrackerLocation::loop() {
         pendingLocPubCallbacks = locPubCallbacks;
         locPubCallbacks.clear();
         _last_location_publish_sec = System.uptime();
-        if (_first_publish || _newMonotonic)
+        if ((_first_publish && !_pending_first_publish) || _newMonotonic)
         {
             _monotonic_publish_sec = _last_location_publish_sec;
             _newMonotonic = false;
@@ -726,6 +727,17 @@ void TrackerLocation::loop() {
             _monotonic_publish_sec += (uint32_t)config_state.interval_max_seconds;
         }
 
+        // Prevent flooding of first publishes when there are no acknowledges.
+        if (!config_state.process_ack && _first_publish) {
+            _first_publish = false;
+        }
+
         location_publish();
+
+        // There may be a delay between the first event being published and an acknowledgement
+        // from the cloud.  This leads to multiple event publishes meant to be the first publish.
+        if (_first_publish && !_pending_first_publish) {
+            _pending_first_publish = true;
+        }
     }
 }

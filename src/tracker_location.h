@@ -153,6 +153,7 @@ class TrackerLocation
         system_tick_t _loopSampleTick = 0;
         bool _pending_immediate;
         bool _first_publish;
+        bool _pending_first_publish;
         unsigned int _earlyWake;
         unsigned int _nextEarlyWake;
 
