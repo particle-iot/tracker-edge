@@ -19,6 +19,8 @@
 #define SHIPPING_MODE_LED_CYCLE_PERIOD_MS       (250)
 #define SHIPPING_MODE_LED_CYCLE_DURATION_MS     (5000)
 #define SHIPPING_MODE_DEFER_DURATION_MS         (5000) // 5 seconds
+#define SHIPPING_MODE_SAMPLE_MS                 (1000) // 1 second
+#define SHIPPING_MODE_TIMEOUT                   (60) // SHIPPING_MODE_SAMPLE_MS intervals
 
 TrackerShipping *TrackerShipping::_instance = nullptr;
 
@@ -36,8 +38,6 @@ void TrackerShipping::pmicHandler()
 
 void TrackerShipping::shutdown()
 {
-    PMIC pmic;
-
     // blink RGB to signal entering shipping mode
     RGB.control(true);
     RGB.brightness(255);
@@ -59,28 +59,46 @@ void TrackerShipping::shutdown()
         attachInterrupt(PMIC_INT, &TrackerShipping::pmicHandler, FALLING);
     }
 
-    WITH_LOCK(pmic)
+    // The PMIC will be locked from this point forward with no further changes allowed
+    PMIC pmic(true);
+
+    // Disable charging will ensure there are no asynchronous events that may interrupt
+    // entering of shipping mode
+    pmic.disableCharging();
+
+    // Clear all faults
+    (void)pmic.getFault();
+    (void)pmic.getFault();
+
+    pmic.disableWatchdog();
+    if (shipping->_checkPower && shipping->_pmicFire)
     {
-        pmic.disableWatchdog();
-        if (shipping->_checkPower && shipping->_pmicFire)
-        {
-            // If the PMIC interrupted us then reset instead of going into shipping mode because
-            // the power is likely to be applied between when the mode was commanded and the delayed
-            // response of this particular handler.
-            System.reset();
-        }
-        pmic.disableBATFET();
+        // If the PMIC interrupted us then reset instead of going into shipping mode because
+        // the power is likely to be applied between when the mode was commanded and the delayed
+        // response of this particular handler.
+        System.reset();
     }
+
+    pmic.disableBATFET();
+
+    // Wait for the PMIC to exit DPDM detection before shutting down
+    int timeout = SHIPPING_MODE_TIMEOUT;
+    while (pmic.isInDPDM() && (timeout-- > 0))
+    {
+        delay(SHIPPING_MODE_SAMPLE_MS);
+    }
+
+    // Clear all faults
+    (void)pmic.getFault();
+    (void)pmic.getFault();
 
     RGB.brightness(0);
 
-    // sleep forever waiting for power to be removed
-    // leave network on for quicker drain of residual power
-    // once main power is removed
+    // Enter sleep with lower level sleep API so power management doesn't override PMIC settings
     SystemSleepConfiguration config;
     config.mode(SystemSleepMode::HIBERNATE)
-      .gpio(PMIC_INT, FALLING);
-    System.sleep(config);
+          .gpio(PMIC_INT, FALLING);
+    hal_sleep_enter(config.halConfig(), nullptr, nullptr);
 
     // shouldn't hit these lines as never coming back from sleep but out of an
     // abundance of paranoia force a reset so we don't get stuck in some weird
