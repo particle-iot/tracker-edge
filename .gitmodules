@@ -10,3 +10,6 @@
 [submodule "lib/can-mcp25x"]
 	path = lib/can-mcp25x
 	url = https://github.com/particle-iot/can-mcp25x.git
+[submodule "lib/fw-config-service"]
+	path = lib/fw-config-service
+	url = https://github.com/particle-iot/fw-config-service.git
