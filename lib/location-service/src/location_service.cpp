@@ -96,6 +96,9 @@ int LocationService::stop() {
 }
 
 int LocationService::getLocation(LocationPoint& point) {
+    point.type = LocationType::DEVICE;
+    point.sources.append(LocationSource::GNSS);
+
     WITH_LOCK(*gps_) {
         point.locked = (gps_->getLock()) ? 1 : 0;
         point.stable = gps_->isLockStable();

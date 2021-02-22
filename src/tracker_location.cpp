@@ -15,6 +15,7 @@
  */
 
 #include <stdint.h>
+#include <algorithm>
 
 #include "Particle.h"
 #include "tracker_config.h"
@@ -29,6 +30,10 @@ static constexpr system_tick_t LoopSampleRate = 1000; // milliseconds
 static constexpr uint32_t EarlySleepSec = 2; // seconds
 static constexpr uint32_t MiscSleepWakeSec = 3; // seconds - miscellaneous time spent by system entering and exiting sleep
 static constexpr uint32_t LockTimeoutSec = 10; // seconds - time to wait for GNSS lock (sleep disabled)
+
+static constexpr size_t EnhancedLocationQueueSize = 5; // up to this many elements
+static constexpr size_t ObjectEstimateWpsHeaderSize = sizeof(",{\"wps\":[]}") - 1 /* null */;
+static constexpr size_t ObjectEstimateWpsDataSize = sizeof("{\"bssid\":\"00:11:22:33:44:55\",\"ch\":99,\"str\":-999},") - 1 /* null */;
 
 static int set_radius_cb(double value, const void *context)
 {
@@ -54,7 +59,7 @@ int TrackerLocation::enter_location_config_cb(bool write, const void *context)
 {
     if(write)
     {
-        memcpy(&config_state_shadow, &config_state, sizeof(config_state_shadow));
+        memcpy(&_config_state_shadow, &_config_state, sizeof(_config_state_shadow));
     }
     return 0;
 }
@@ -65,11 +70,11 @@ int TrackerLocation::exit_location_config_cb(bool write, int status, const void 
 {
     if(write && !status)
     {
-        if(config_state_shadow.interval_min_seconds > config_state_shadow.interval_max_seconds)
+        if(_config_state_shadow.interval_min_seconds > _config_state_shadow.interval_max_seconds)
         {
             return -EINVAL;
         }
-        memcpy(&config_state, &config_state_shadow, sizeof(config_state));
+        memcpy(&_config_state, &_config_state_shadow, sizeof(_config_state));
     }
     return status;
 }
@@ -90,20 +95,40 @@ void TrackerLocation::init()
         {
             ConfigFloat("radius", get_radius_cb, set_radius_cb, &LocationService::instance()).min(0.0).max(1000000.0),
             ConfigInt("interval_min", config_get_int32_cb, config_set_int32_cb,
-                &config_state.interval_min_seconds, &config_state_shadow.interval_min_seconds,
+                &_config_state.interval_min_seconds, &_config_state_shadow.interval_min_seconds,
                 0, 86400l),
             ConfigInt("interval_max", config_get_int32_cb, config_set_int32_cb,
-                &config_state.interval_max_seconds, &config_state_shadow.interval_max_seconds,
+                &_config_state.interval_max_seconds, &_config_state_shadow.interval_max_seconds,
                 0, 86400l),
             ConfigBool("min_publish",
                 config_get_bool_cb, config_set_bool_cb,
-                &config_state.min_publish, &config_state_shadow.min_publish),
+                &_config_state.min_publish, &_config_state_shadow.min_publish),
             ConfigBool("lock_trigger",
                 config_get_bool_cb, config_set_bool_cb,
-                &config_state.lock_trigger, &config_state_shadow.lock_trigger),
+                &_config_state.lock_trigger, &_config_state_shadow.lock_trigger),
             ConfigBool("loc_ack",
                 config_get_bool_cb, config_set_bool_cb,
-                &config_state.process_ack, &config_state_shadow.process_ack)
+                &_config_state.process_ack, &_config_state_shadow.process_ack),
+            ConfigBool("tower",
+                config_get_bool_cb, config_set_bool_cb,
+                &_config_state.tower, &_config_state_shadow.tower
+            ),
+            ConfigBool("gnss",
+                config_get_bool_cb, config_set_bool_cb,
+                &_config_state.gnss, &_config_state_shadow.gnss
+            ),
+            ConfigBool("wps",
+                config_get_bool_cb, config_set_bool_cb,
+                &_config_state.wps, &_config_state_shadow.wps
+            ),
+            ConfigBool("enhance_loc",
+                config_get_bool_cb, config_set_bool_cb,
+                &_config_state.enhance_loc, &_config_state_shadow.enhance_loc
+            ),
+            ConfigBool("loc_cb",
+                config_get_bool_cb, config_set_bool_cb,
+                &_config_state.loc_cb, &_config_state_shadow.loc_cb
+            ),
         },
         std::bind(&TrackerLocation::enter_location_config_cb, this, _1, _2),
         std::bind(&TrackerLocation::exit_location_config_cb, this, _1, _2, _3)
@@ -113,13 +138,96 @@ void TrackerLocation::init()
 
     CloudService::instance().regCommandCallback("get_loc", &TrackerLocation::get_loc_cb, this);
 
-    _last_location_publish_sec = System.uptime() - config_state.interval_min_seconds;
+    _last_location_publish_sec = System.uptime() - _config_state.interval_min_seconds;
 
     _sleep.registerSleepPrepare([this](TrackerSleepContext context){ this->onSleepPrepare(context); });
     _sleep.registerSleep([this](TrackerSleepContext context){ this->onSleep(context); });
     _sleep.registerSleepCancel([this](TrackerSleepContext context){ this->onSleepCancel(context); });
     _sleep.registerWake([this](TrackerSleepContext context){ this->onWake(context); });
     _sleep.registerStateChange([this](TrackerSleepContext context){ this->onSleepState(context); });
+
+    CloudService::instance().regCommandCallback("loc-enhanced", &TrackerLocation::enhanced_cb, this);
+}
+
+int TrackerLocation::buildEnhLocation(JSONValue& node, LocationPoint& point) {
+    JSONObjectIterator locChild(node);
+
+    while(locChild.next()) {
+        if (locChild.name() == "lat") {
+            if (!locChild.value().isNumber()) {
+                return -EINVAL;
+            }
+            point.latitude = (float)locChild.value().toDouble();
+        }
+        else if (locChild.name() == "lon") {
+            if (!locChild.value().isNumber()) {
+                return -EINVAL;
+            }
+            point.longitude = (float)locChild.value().toDouble();
+        }
+        else if (locChild.name() == "h_acc") {
+            if (!locChild.value().isNumber()) {
+                return -EINVAL;
+            }
+            point.horizontalAccuracy = (float)locChild.value().toDouble();
+        }
+        else if (locChild.name() == "src") {
+            if (!locChild.value().isArray()) {
+                return -EINVAL;
+            }
+            JSONArrayIterator srcList(locChild.value());
+            while (srcList.next()) {
+                if (srcList.value().isString()) {
+                    auto source = LocationSource::NONE;
+                    if (srcList.value().toString() == "cell") {
+                        source = LocationSource::CELL;
+                    }
+                    else if (srcList.value().toString() == "wifi") {
+                        source = LocationSource::WIFI;
+                    }
+                    else if (srcList.value().toString() == "gnss") {
+                        source = LocationSource::GNSS;
+                    }
+                    else {
+                        continue;
+                    }
+                    point.sources.append(source);
+                }
+                else {
+                    return -EINVAL;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int TrackerLocation::enhanced_cb(CloudServiceStatus status, JSONValue *root, const void *context) {
+    (void)status;
+    (void)context;
+
+    LocationPoint point = {};
+    JSONValue* locObject = nullptr;
+    JSONValue child;
+
+    JSONObjectIterator item(*root);
+    while(item.next()) {
+        if ((item.name() == "loc-enhanced") && item.value().isObject()) {
+            child = item.value();
+            locObject = &child;
+        }
+    }
+
+    if (locObject) {
+        point.type = LocationType::CLOUD;
+        buildEnhLocation(*locObject, point);
+        for (auto item : enhancedLocCallbacks) {
+            item(point);
+        }
+    }
+
+    return 0;
 }
 
 int TrackerLocation::regLocGenCallback(
@@ -137,6 +245,14 @@ int TrackerLocation::regLocPubCallback(
     const void *context)
 {
     locPubCallbacks.append(std::bind(cb, _1, _2, _3, context));
+    return 0;
+}
+
+int TrackerLocation::regEnhancedLocCallback(
+    std::function<void(const LocationPoint &, const void *)> cb,
+    const void *context)
+{
+    enhancedLocCallbacks.append(std::bind(cb, _1, context));
     return 0;
 }
 
@@ -235,7 +351,7 @@ void TrackerLocation::location_publish()
     cloud_service.lock();
 
     CloudServicePublishFlags cloud_flags =
-        (config_state.process_ack) ? CloudServicePublishFlags::FULL_ACK : CloudServicePublishFlags::NONE;
+        (_config_state.process_ack) ? CloudServicePublishFlags::FULL_ACK : CloudServicePublishFlags::NONE;
 
     if(location_publish_retry_str)
     {
@@ -293,14 +409,25 @@ void TrackerLocation::location_publish()
     cloud_service.unlock();
 }
 
-void TrackerLocation::enableNetworkGnss() {
-    LocationService::instance().start();
+void TrackerLocation::enableNetwork() {
     _sleep.forceFullWakeCycle();
     _gnssStartedSec = System.uptime();
 }
 
+void TrackerLocation::enableGnss() {
+    LocationService::instance().start();
+}
+
 void TrackerLocation::disableGnss() {
     LocationService::instance().stop();
+}
+
+void TrackerLocation::enableWifi() {
+    WiFi.on();
+}
+
+void TrackerLocation::disableWifi() {
+    WiFi.off();
 }
 
 bool TrackerLocation::isSleepEnabled() {
@@ -328,13 +455,13 @@ EvaluationResults TrackerLocation::evaluatePublish() {
     uint32_t maxInterval = now - _monotonic_publish_sec;
 
     bool networkNeeded = false;
-    uint32_t max = (uint32_t)config_state.interval_max_seconds;
+    uint32_t max = (uint32_t)_config_state.interval_max_seconds;
     auto maxNetwork = max;
     if  (maxNetwork > (uint32_t)_nextEarlyWake) {
         maxNetwork -= (uint32_t)_nextEarlyWake;
     }
 
-    if (config_state.interval_max_seconds) {
+    if (_config_state.interval_max_seconds) {
         if (maxInterval >= maxNetwork) {
             // max interval adjusted for early wake
             Log.trace("%s maxNetwork", __FUNCTION__);
@@ -349,21 +476,21 @@ EvaluationResults TrackerLocation::evaluatePublish() {
         }
     }
 
-    uint32_t min = (uint32_t)config_state.interval_min_seconds;
+    uint32_t min = (uint32_t)_config_state.interval_min_seconds;
     auto minNetwork = min;
     if  (minNetwork > (uint32_t)_nextEarlyWake) {
         minNetwork -= (uint32_t)_nextEarlyWake;
     }
 
     if (_pending_triggers.size()) {
-        if (!config_state.interval_min_seconds ||
+        if (!_config_state.interval_min_seconds ||
             (interval >= minNetwork)) {
             // min interval adjusted for early wake
             Log.trace("%s minNetwork", __FUNCTION__);
             networkNeeded = true;
         }
 
-        if (!config_state.interval_min_seconds ||
+        if (!_config_state.interval_min_seconds ||
             (interval >= min)) {
             // no min interval or past the min interval so can publish
             Log.trace("%s min", __FUNCTION__);
@@ -382,11 +509,11 @@ void TrackerLocation::onSleepPrepare(TrackerSleepContext context) {
     unsigned int wake = _last_location_publish_sec;
     int32_t interval = 0;
     if (_pending_triggers.size()) {
-        interval = config_state.interval_min_seconds;
+        interval = _config_state.interval_min_seconds;
         wake += interval;
     }
     else {
-        interval = config_state.interval_max_seconds;
+        interval = _config_state.interval_max_seconds;
         wake += interval;
     }
 
@@ -445,6 +572,7 @@ void TrackerLocation::onSleepCancel(TrackerSleepContext context) {
 // of no return to cancel the pending sleep cycle.
 void TrackerLocation::onSleep(TrackerSleepContext context) {
     disableGnss();
+    disableWifi();
 }
 
 // This callback will be called immediately after wake from sleep and allows us to figure out if the network interface
@@ -456,7 +584,15 @@ void TrackerLocation::onWake(TrackerSleepContext context) {
     auto result = evaluatePublish();
 
     if (result.networkNeeded) {
-        enableNetworkGnss();
+        enableNetwork();
+        if (_config_state_loop_safe.gnss) {
+            enableGnss();
+        }
+        if (_config_state_loop_safe.enhance_loc) {
+            if (_config_state_loop_safe.wps) {
+                enableWifi();
+            }
+        }
         Log.trace("%s needs to start the network", __FUNCTION__);
     }
     else {
@@ -484,8 +620,196 @@ void TrackerLocation::onSleepState(TrackerSleepContext context) {
     }
 }
 
+int TrackerLocation::parseServeCell(const char* in, CellularServing& out) {
+    CellularServing ret;
+    char state[16] = {};
+    char rat[16] = {};
+
+    out = {};
+    auto nitems = sscanf(in, " +QENG: \"servingcell\",\"%15[^\"]\",\"%15[^\"]\",\"%*15[^\"]\","
+            "%u,%u,%lX,"
+            "%*15[^,],%*15[^,],%*15[^,],%*15[^,],%*15[^,],%X,%d",
+            state, rat,
+            &ret.mcc, &ret.mnc, &ret.cellId, &ret.tac, &ret.signalPower);
+
+    if (nitems < 7) {
+        return SYSTEM_ERROR_NOT_ENOUGH_DATA;
+    }
+
+    if (!strncmp(rat, "CAT-M", 5)) {
+        out.rat = RadioAccessTechnology::LTE_CAT_M1;
+    }
+    else if (!strncmp(rat, "LTE", 3)) {
+        out.rat = RadioAccessTechnology::LTE;
+    }
+    else if (!strncmp(rat, "CAT-NB", 6)) {
+        out.rat = RadioAccessTechnology::LTE_NB_IOT;
+    }
+    else {
+        return SYSTEM_ERROR_NOT_SUPPORTED;
+    }
+
+    out.mcc = ret.mcc;
+    out.mnc = ret.mnc;
+    out.cellId = ret.cellId;
+    out.tac = ret.tac;
+    out.signalPower = ret.signalPower;
+
+    return SYSTEM_ERROR_NONE;
+}
+
+int TrackerLocation::serving_cb(int type, const char* buf, int len, TrackerLocation* context) {
+    if (type == TYPE_OK) {
+        return RESP_OK;
+    }
+
+    (void)parseServeCell(buf, context->servingTower);
+    return WAIT;
+}
+
+int TrackerLocation::parseCell(const char* in, CellularNeighbors& out) {
+    CellularNeighbors ret;
+    char rat[16] = {0};
+
+    auto nitems = sscanf(in, " +QENG: \"neighbourcell %*15[^\"]\",\"%15[^\"]\",%lu,%lu,%d,%d,%d",
+            rat,
+            &ret.earfcn, &ret.neighborId, &ret.signalQuality, &ret.signalPower, &ret.signalStrength);
+
+    if (nitems < 6) {
+        return SYSTEM_ERROR_NOT_ENOUGH_DATA;
+    }
+
+    if (!strncmp(rat, "CAT-M", 5)) {
+        out.rat = RadioAccessTechnology::LTE_CAT_M1;
+    }
+    else if (!strncmp(rat, "LTE", 3)) {
+        out.rat = RadioAccessTechnology::LTE;
+    }
+    else if (!strncmp(rat, "CAT-NB", 6)) {
+        out.rat = RadioAccessTechnology::LTE_NB_IOT;
+    }
+    else {
+        return SYSTEM_ERROR_NOT_SUPPORTED;
+    }
+
+    out.earfcn = ret.earfcn;
+    out.neighborId = ret.neighborId;
+    out.signalQuality = ret.signalQuality;
+    out.signalPower = ret.signalPower;
+    out.signalStrength = ret.signalStrength;
+
+    return SYSTEM_ERROR_NONE;
+}
+
+int TrackerLocation::neighbor_cb(int type, const char* buf, int len, TrackerLocation* context) {
+    if (type == TYPE_OK) {
+        return RESP_OK;
+    }
+
+    CellularNeighbors neighbor;
+    if (parseCell(buf, neighbor) == SYSTEM_ERROR_NONE) {
+        context->towerList.append(neighbor);
+    }
+
+    return WAIT;
+}
+
+size_t TrackerLocation::buildTowerInfo(JSONBufferWriter& writer, size_t size) {
+    if (!_config_state_loop_safe.tower) {
+        return 0;
+    }
+
+    size_t written = writer.dataSize();
+
+    // The cellular information here is always sent and not configurable
+    Cellular.command(serving_cb, this, 10000, "AT+QENG=\"servingcell\"\r\n");
+    if (servingTower.rat != RadioAccessTechnology::NONE) {
+        writer.name("towers").beginArray();
+        writer.beginObject();
+        writer.name("rat").value("lte");
+        writer.name("mcc").value((unsigned)servingTower.mcc);
+        writer.name("mnc").value((unsigned)servingTower.mnc);
+        writer.name("lac").value((unsigned)servingTower.tac);
+        writer.name("cid").value((unsigned)servingTower.cellId);
+        writer.name("str").value(servingTower.signalPower);
+        writer.endObject();
+
+        towerList.clear();
+        (void)Cellular.command(neighbor_cb, this, 10000, "AT+QENG=\"neighbourcell\"\r\n");
+        auto towerCount = TrackerLocationMaxTowerSend - 1;  // one has already been taken as the serving tower
+        for (auto tower: towerList) {
+            if (towerCount-- <= 0) {
+                break;
+            }
+            writer.beginObject();
+            writer.name("nid").value((unsigned)tower.neighborId);
+            writer.name("ch").value((unsigned)tower.earfcn);
+            writer.name("str").value(tower.signalPower);
+            writer.endObject();
+        }
+
+        writer.endArray();
+    }
+
+    return writer.dataSize() - written;
+}
+
+void TrackerLocation::wifi_cb(WiFiAccessPoint* wap, TrackerLocation* context) {
+    if (context->wpsList.size() < TrackerLocationMaxWpsCollect)
+        context->wpsList.append(*wap);
+}
+
+size_t TrackerLocation::buildWpsInfo(JSONBufferWriter& writer, size_t size) {
+    if (!_config_state_loop_safe.wps) {
+        return 0;
+    }
+
+    size_t written = writer.dataSize();
+
+    do {
+        // This is a work-around to determine how much data is left in the publish message to
+        // allow the WPS object to fill up as much information as possible before closing the
+        // JSON message.
+        if (ObjectEstimateWpsHeaderSize >= size) {
+            // There is no use on continuing
+            break;
+        }
+
+        size_t wpsCount = (size - ObjectEstimateWpsHeaderSize) / ObjectEstimateWpsDataSize;
+        if (wpsCount == 0) {
+            // There is no use on continuing
+            break;
+        }
+
+        wpsList.clear();
+        (void)WiFi.scan(wifi_cb, this);
+        // NOTE: Any sorting of WiFi access points should be performed here
+        if (!wpsList.isEmpty()) {
+            writer.name("wps").beginArray();
+            int wifiCount = wpsCount;
+            for (auto ap: wpsList) {
+                if (wifiCount-- <= 0) {
+                    break;
+                }
+                String bssid = String::format("%02x:%02x:%02x:%02x:%02x:%02x",
+                    ap.bssid[0], ap.bssid[1], ap.bssid[2], ap.bssid[3], ap.bssid[4], ap.bssid[5]);
+                writer.beginObject();
+                writer.name("bssid").value(bssid);
+                writer.name("ch").value(ap.channel);
+                writer.name("str").value(ap.rssi);
+                writer.endObject();
+            }
+            writer.endArray();
+        }
+    } while (false);
+
+    return writer.dataSize() - written;
+}
+
 GnssState TrackerLocation::loopLocation(LocationPoint& cur_loc) {
-    static GnssState lastGnssState = GnssState::OFF;
+    if (!_config_state.gnss) {
+        return GnssState::DISABLED;
+    }
     GnssState currentGnssState = GnssState::ON_LOCKED_STABLE;
 
     LocationStatus locStatus;
@@ -526,7 +850,7 @@ GnssState TrackerLocation::loopLocation(LocationPoint& cur_loc) {
 
     // Detect GNSS locked changes
     if ((currentGnssState == GnssState::ON_LOCKED_STABLE) &&
-        (currentGnssState != lastGnssState)) {
+        (currentGnssState != _lastGnssState)) {
 
         // Capture the time that the first lock out of sleep happened
         if (_firstLockSec == 0) {
@@ -534,32 +858,32 @@ GnssState TrackerLocation::loopLocation(LocationPoint& cur_loc) {
         }
 
         // Only publish with "lock" trigger when not sleeping and when enabled to do so
-        if (_sleep.isSleepDisabled() && config_state.lock_trigger) {
+        if (_sleep.isSleepDisabled() && _config_state.lock_trigger) {
             triggerLocPub(Trigger::NORMAL,"lock");
         }
     }
 
-    lastGnssState = currentGnssState;
+    _lastGnssState = currentGnssState;
 
     return currentGnssState;
 }
 
 void TrackerLocation::buildPublish(LocationPoint& cur_loc) {
-    if(cur_loc.locked)
-    {
+    bool locked = (_config_state.gnss) ? cur_loc.locked : false;
+
+    if(locked) {
         LocationService::instance().setWayPoint(cur_loc.latitude, cur_loc.longitude);
     }
 
     CloudService &cloud_service = CloudService::instance();
     cloud_service.beginCommand("loc");
     cloud_service.writer().name("loc").beginObject();
-    if (cur_loc.locked)
-    {
+    if (locked) {
         cloud_service.writer().name("lck").value(1);
         cloud_service.writer().name("time").value((unsigned int) cur_loc.epochTime);
         cloud_service.writer().name("lat").value(cur_loc.latitude, 8);
         cloud_service.writer().name("lon").value(cur_loc.longitude, 8);
-        if(!config_state.min_publish)
+        if(!_config_state.min_publish)
         {
             cloud_service.writer().name("alt").value(cur_loc.altitude, 3);
             cloud_service.writer().name("hd").value(cur_loc.heading, 2);
@@ -568,17 +892,17 @@ void TrackerLocation::buildPublish(LocationPoint& cur_loc) {
             cloud_service.writer().name("v_acc").value(cur_loc.verticalAccuracy, 3);
         }
     }
-    else
-    {
+    else {
         cloud_service.writer().name("lck").value(0);
     }
-    for(auto cb : locGenCallbacks)
-    {
+
+    for(auto cb : locGenCallbacks) {
         cb(cloud_service.writer(), cur_loc);
     }
+
     cloud_service.writer().endObject();
-    if(!_pending_triggers.isEmpty())
-    {
+
+    if(!_pending_triggers.isEmpty()) {
         std::lock_guard<RecursiveMutex> lg(mutex);
         cloud_service.writer().name("trig").beginArray();
         for (auto trigger : _pending_triggers) {
@@ -587,6 +911,21 @@ void TrackerLocation::buildPublish(LocationPoint& cur_loc) {
         _pending_triggers.clear();
         cloud_service.writer().endArray();
     }
+
+    if (_config_state_loop_safe.enhance_loc) {
+        // Request a callback of the enhanced location when made available
+        if (_config_state_loop_safe.loc_cb) {
+            cloud_service.writer().name("loc_cb").value(true);
+        }
+
+        size_t remainingSize = cloud_service.writer().bufferSize() - 1 /* null */
+            - cloud_service.writer().dataSize() - cloud_service.estimatedEndCommandSize();
+
+        // Populate cellular tower information for publish
+        remainingSize -= buildTowerInfo(cloud_service.writer(), remainingSize);
+        remainingSize -= buildWpsInfo(cloud_service.writer(), remainingSize);
+    }
+
     Log.info("%.*s", cloud_service.writer().dataSize(), cloud_service.writer().buffer());
 }
 
@@ -596,7 +935,44 @@ void TrackerLocation::loop() {
     {
         return;
     }
+
+    bool firstLoop = (_loopSampleTick == 0);
     _loopSampleTick = millis();
+
+    // Sync power state changes
+    tracker_location_config_t captureConfig = _config_state;
+
+    if (firstLoop) {
+        if (captureConfig.gnss) {
+            enableGnss();
+        }
+        if (captureConfig.enhance_loc && captureConfig.wps) {
+            enableWifi();
+        }
+        else if (captureConfig.enhance_loc && !captureConfig.wps) {
+            disableWifi();
+        }
+    }
+    else {
+        LocationStatus gnssPoweredStatus;
+        LocationService::instance().getStatus(gnssPoweredStatus);
+        if (captureConfig.gnss && !gnssPoweredStatus.powered) {
+            enableGnss();
+        }
+        else if (!captureConfig.gnss && gnssPoweredStatus.powered) {
+            disableGnss();
+        }
+
+        if (captureConfig.enhance_loc && captureConfig.wps && !_config_state_loop_safe.wps) {
+            enableWifi();
+        }
+        else if (captureConfig.enhance_loc && !captureConfig.wps && _config_state_loop_safe.wps) {
+            disableWifi();
+        }
+    }
+
+    // The rest of this loop will depend on a constant setting for GNSS and WiFi condif state
+    _config_state_loop_safe = captureConfig;
 
     // First take care of any retry attempts of last loc
     if (location_publish_retry_str && Particle.connected())
@@ -615,13 +991,14 @@ void TrackerLocation::loop() {
     // This evaluation may have performed earlier and determined that no network was needed.  Check again
     // because this loop may overlap with required network operations.
     if (!_sleep.isFullWakeCycle() && publishReason.networkNeeded) {
-        enableNetworkGnss();
+        enableNetwork();
     }
 
     bool publishNow = false;
 
     //                                   : NONE      TIME        TRIG        IMM
     //                                    ----------------------------------------
+    // GnssState::DISABLED                  NA       PUB         PUB         PUB
     // GnssState::OFF                       NA       PUB         PUB         PUB
     // GnssState::ON_UNLOCKED               NA       WAIT        WAIT        PUB
     // GnssState::ON_LOCKED_UNSTABLE        NA       WAIT        WAIT        PUB
@@ -635,6 +1012,8 @@ void TrackerLocation::loop() {
 
         case PublishReason::TIME: {
             switch (locationStatus) {
+                case GnssState::DISABLED:
+                // fall through
                 case GnssState::ON_LOCKED_STABLE: {
                     Log.trace("publishing from max interval");
                     triggerLocPub(Trigger::NORMAL,"time");
@@ -662,6 +1041,8 @@ void TrackerLocation::loop() {
 
         case PublishReason::TRIGGERS: {
             switch (locationStatus) {
+                case GnssState::DISABLED:
+                // fall through
                 case GnssState::ON_LOCKED_STABLE: {
                     Log.trace("publishing from triggers");
                     publishNow = true;
@@ -724,11 +1105,11 @@ void TrackerLocation::loop() {
         }
         else
         {
-            _monotonic_publish_sec += (uint32_t)config_state.interval_max_seconds;
+            _monotonic_publish_sec += (uint32_t)_config_state.interval_max_seconds;
         }
 
         // Prevent flooding of first publishes when there are no acknowledges.
-        if (!config_state.process_ack && _first_publish) {
+        if (!_config_state.process_ack && _first_publish) {
             _first_publish = false;
         }
 

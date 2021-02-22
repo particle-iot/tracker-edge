@@ -589,7 +589,7 @@ int TrackerSleep::loop() {
           (millis() - _lastShutdownMs >= TrackerSleepShutdownTimeout)) {
         // Stop everything
         stopModem();
-        Tracker::instance().startShippingMode();
+        TrackerShipping::instance().enter(true);
         while (true) {}
       }
       break;

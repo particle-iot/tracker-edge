@@ -22,6 +22,27 @@
 
 
 /**
+ * @brief Type of location point structure
+ * 
+ */
+enum class LocationType {
+	NONE,                           /**< Initial and default type */
+	DEVICE,                         /**< Location point came from the device */
+	CLOUD,                          /**< Location point came from the cloud */
+};
+
+/**
+ * @brief Location source for coordinate
+ * 
+ */
+enum class LocationSource {
+	NONE,                           /**< Initial and default source */
+	CELL,                           /**< Geocoordinate sourced from cellular towers */
+	WIFI,                           /**< Geocoordinate sourced from WiFi access points */
+	GNSS,                           /**< Geocoordinate sourced from GNSS satellites */
+};
+
+/**
  * @brief Timescale relevant to epoch time
  *
  */
@@ -39,6 +60,8 @@ enum class LocationTimescale {
  *
  */
 struct LocationPoint {
+    LocationType type;				/**< Type of location point */
+    Vector<LocationSource> sources;	/**< List of location sources sorted by highest accuracy */
     int locked;                     /**< Indication of GNSS locked status */
     unsigned int lockedDuration;    /**< Duration of the current GNSS lock (if applicable) */
     bool stable;                    /**< Indication if GNNS lock is stable (if applicable) */
