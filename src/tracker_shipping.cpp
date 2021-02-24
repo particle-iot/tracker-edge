@@ -15,6 +15,7 @@
  */
 
 #include "tracker_shipping.h"
+#include "tracker.h"
 
 #define SHIPPING_MODE_LED_CYCLE_PERIOD_MS       (250)
 #define SHIPPING_MODE_LED_CYCLE_DURATION_MS     (5000)
@@ -24,9 +25,23 @@
 
 TrackerShipping *TrackerShipping::_instance = nullptr;
 
-int TrackerShipping::regShutdownCallback(shipping_mode_shutdown_cb_t cb)
+int TrackerShipping::regShutdownBeginCallback(ShippingModeCb begin)
 {
-    shutdown_cb = cb;
+    _beginCallback = begin;
+
+    return 0;
+}
+
+int TrackerShipping::regShutdownIoCallback(ShippingModeCb io)
+{
+    _ioCallback = io;
+
+    return 0;
+}
+
+int TrackerShipping::regShutdownFinalCallback(ShippingModeCb final)
+{
+    _finalCallback = final;
 
     return 0;
 }
@@ -38,6 +53,11 @@ void TrackerShipping::pmicHandler()
 
 void TrackerShipping::shutdown()
 {
+    if(_ioCallback)
+    {
+        (void)_ioCallback();
+    }
+
     // blink RGB to signal entering shipping mode
     RGB.control(true);
     RGB.brightness(255);
@@ -94,6 +114,11 @@ void TrackerShipping::shutdown()
 
     RGB.brightness(0);
 
+    if(_finalCallback)
+    {
+        (void)_finalCallback();
+    }
+
     // Enter sleep with lower level sleep API so power management doesn't override PMIC settings
     SystemSleepConfiguration config;
     config.mode(SystemSleepMode::HIBERNATE)
@@ -108,9 +133,9 @@ void TrackerShipping::shutdown()
 
 int TrackerShipping::enter(bool checkPower)
 {
-    if(shutdown_cb)
+    if(_beginCallback)
     {
-        int rval = shutdown_cb();
+        int rval = _beginCallback();
 
         if(rval)
         {
@@ -122,7 +147,7 @@ int TrackerShipping::enter(bool checkPower)
     _checkPower = checkPower;
 
     // Timer call will shutdown device so don't worry about dynamic memory
-    auto deferredShutdown = new Timer(SHIPPING_MODE_DEFER_DURATION_MS, TrackerShipping::shutdown, true);
+    auto deferredShutdown = new Timer(SHIPPING_MODE_DEFER_DURATION_MS, &TrackerShipping::shutdown, *this, true);
     deferredShutdown->start();
 
     return 0; // compiler warnings about no return...

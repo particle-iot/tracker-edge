@@ -26,8 +26,7 @@ PRODUCT_ID(TRACKER_PRODUCT_ID);
 PRODUCT_VERSION(TRACKER_PRODUCT_VERSION);
 
 STARTUP(
-    // Correct power manager states in the DCT
-    Tracker::enablePowerManagement();
+    Tracker::startup();
 );
 
 SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
@@ -44,5 +43,5 @@ void setup()
 
 void loop()
 {
-     Tracker::instance().loop();
+    Tracker::instance().loop();
 }

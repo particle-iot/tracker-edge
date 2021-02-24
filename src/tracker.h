@@ -36,13 +36,11 @@
 #include "temperature.h"
 #include "mcp_can.h"
 
-struct TrackerConfig
-{
+struct TrackerCloudConfig {
     bool UsbCommandEnable;
 };
 
-enum class TrackerChargeState
-{
+enum class TrackerChargeState {
     CHARGE_INIT,
     CHARGE_DONT_CARE,
     CHARGE_CARE,
@@ -53,36 +51,220 @@ struct TrackerChargeStatus {
     TrackerChargeState state;
 };
 
+/**
+ * @brief TrackerConfiguration class to configure the tracker device in application
+ *
+ */
+class TrackerConfiguration {
+public:
+    /**
+     * @brief Construct a new Tracker Configuration object
+     *
+     */
+    TrackerConfiguration() :
+        _enableIo(true),
+        _enableIoSleep(false) {
+
+    }
+
+    /**
+     * @brief Construct a new Tracker Configuration object
+     *
+     */
+    TrackerConfiguration(TrackerConfiguration&&) = default;
+
+    /**
+     * @brief Enable or disable IO/CAN power at initialization
+     *
+     * @param enable Turn IO/power on CAN power at initialization
+     * @return TrackerConfiguration&
+     */
+    TrackerConfiguration& enableIoCanPower(bool enable) {
+        _enableIo = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if IO/CAN power is powered on at initialization
+     *
+     * @return true Powered at initialization
+     * @return false Not powered at initialization
+     */
+    bool enableIoCanPower() const {
+        return _enableIo;
+    }
+
+    /**
+     * @brief Enable or disable IO/CAN power shutdown prior to sleep
+     *
+     * @param enable Power down IO/CAN power before entering sleep; otherwise, leave alone for user
+     * @return TrackerConfiguration&
+     */
+    TrackerConfiguration& enableIoCanPowerSleep(bool enable) {
+        _enableIoSleep = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if IO/CAN power will be powered down prior to sleep
+     *
+     * @return true Powered off at sleep
+     * @return false IO/CAN power under user control
+     */
+    bool enableIoCanPowerSleep() const {
+        return _enableIoSleep;
+    }
+
+    TrackerConfiguration& operator=(const TrackerConfiguration& rhs) {
+        if (this == &rhs) {
+            return *this;
+        }
+        this->_enableIo = rhs._enableIo;
+        this->_enableIoSleep = rhs._enableIoSleep;
+
+        return *this;
+    }
+private:
+    bool _enableIo;
+    bool _enableIoSleep;
+};
+
 // this class encapsulates the underlying modules and builds on top of them to
 // provide a cohesive asset tracking application
-class Tracker
-{
+class Tracker {
     public:
-        static Tracker &instance()
-        {
-            if(!_instance)
-            {
+        static Tracker &instance() {
+            if(!_instance) {
                 _instance = new Tracker();
             }
             return *_instance;
         }
 
-        void startLowBatteryShippingMode();
-        static int enablePowerManagement();
-        void init();
+        /**
+         * @brief Startup for early device intitialization
+         *
+         */
+        static void startup();
+
+        /**
+         * @brief Initialize device for application setup()
+         *
+         * @retval SYSTEM_ERROR_NONE
+         */
+        int init();
+
+        /**
+         * @brief Initializate device with given configuration for application setup()
+         *
+         * @param config Configuration for general tracker operation
+         * @retval SYSTEM_ERROR_NONE
+         */
+        int init(const TrackerConfiguration& config) {
+            _deviceConfig = config;
+            return init();
+        }
+
+        /**
+         * @brief Perform device functionality for application loop()
+         *
+         */
         void loop();
+
+        /**
+         * @brief Stop services on device
+         *
+         * @retval SYSTEM_ERROR_NONE
+         */
         int stop();
 
-        uint32_t getModel() {return _model;}
-        uint32_t getVariant() {return _variant;}
+        /**
+         * @brief Prepare tracker IO and peripherals for shutdown
+         *
+         * @retval SYSTEM_ERROR_NONE
+         */
+        int end();
 
+        /**
+         * @brief Get the tracker hardware model number
+         *
+         * @return uint32_t Model number
+         */
+        uint32_t getModel() const {
+            return _model;
+        }
+
+        /**
+         * @brief Get the tracker hardware variant number
+         *
+         * @return uint32_t Variant number
+         */
+        uint32_t getVariant() const {
+            return _variant;
+        }
+
+        /**
+         * @brief Enable battery charging
+         *
+         * @retval SYSTEM_ERROR_NONE
+         */
         int enableCharging();
+
+        /**
+         * @brief Disable battery charging
+         *
+         * @retval SYSTEM_ERROR_NONE
+         */
         int disableCharging();
+
+        /**
+         * @brief Force battery charge current
+         *
+         * @param current Current in milliampheres
+         * @retval SYSTEM_ERROR_NONE
+         */
         int setChargeCurrent(uint16_t current);
 
-        bool isUsbCommandEnabled() { return _config.UsbCommandEnable; }
+        /**
+         * @brief Enable or disable IO/CAN power
+         *
+         * @param enable Enable IO/CAN power when true
+         */
+        void enableIoCanPower(bool enable);
 
+        /**
+         * @brief Indicates whether device can accept commands through USB interface
+         *
+         * @return true Commands are accepted via USB
+         * @return false Commands are not accepted via USB
+         */
+        bool isUsbCommandEnabled() const {
+            return _cloudConfig.UsbCommandEnable;
+        }
+
+        /**
+         * @brief Enable or disable application watchdog
+         *
+         * @param enable
+         */
         void enableWatchdog(bool enable);
+
+        /**
+         * @brief Invoke shipping mode
+         *
+         */
+        void startShippingMode();
+
+        /**
+         * @brief Start preparing for sleep
+         *
+         */
+        int prepareSleep();
+
+        /**
+         * @brief Exit sleep
+         *
+         */
+        int prepareWake();
 
         // underlying services exposed to allow sharing with rest of the system
         CloudService &cloudService;
@@ -97,18 +279,21 @@ class Tracker
         TrackerMotion &motion;
         TrackerShipping &shipping;
         TrackerRGB &rgb;
+
     private:
         Tracker();
 
         int chargeCallback(TemperatureChargeEvent event);
 
         static Tracker* _instance;
-        TrackerConfig _config;
+        TrackerCloudConfig _cloudConfig;
+        TrackerConfiguration _deviceConfig;
 
         uint32_t _model;
         uint32_t _variant;
 
-        uint32_t last_loop_sec;
+        uint32_t _lastLoopSec;
+        bool _canPowerEnabled;
         bool _pastWarnLimit;
         unsigned int _evalTick;
         bool _lastBatteryCharging;
@@ -121,13 +306,25 @@ class Tracker
         unsigned int _evalChargingTick;
         bool _batteryChargeEnabled;
 
+        // Startup and initialization related
         static int getPowerManagementConfig(hal_power_config& conf);
         static int setPowerManagementConfig(const hal_power_config& conf);
-        void initIo();
+        static int enablePowerManagement();
+        static void completeSetupDone();
+        int initEsp32();
+        int initCan();
+        int initIo();
+
+        // Sleep related
         void onSleepPrepare(TrackerSleepContext context);
         void onSleep(TrackerSleepContext context);
         void onWake(TrackerSleepContext context);
         void onSleepStateChange(TrackerSleepContext context);
+
+        // Shutdown related
+        void startLowBatteryShippingMode();
+
+        // Various methods
         int registerConfig();
         static void loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *context);
         TrackerChargeState batteryDecode(battery_state_t state);

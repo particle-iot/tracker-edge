@@ -18,7 +18,7 @@
 
 #include "cloud_service.h"
 
-typedef std::function<int(void)> shipping_mode_shutdown_cb_t;
+using ShippingModeCb = std::function<int(void)>;
 
 class TrackerShipping
 {
@@ -35,16 +35,25 @@ class TrackerShipping
 
         int enter(bool checkPower = false);
 
-        int regShutdownCallback(shipping_mode_shutdown_cb_t cb);
+        int regShutdownBeginCallback(ShippingModeCb begin);
+        int regShutdownIoCallback(ShippingModeCb io);
+        int regShutdownFinalCallback(ShippingModeCb final);
     private:
-        TrackerShipping() : shutdown_cb(nullptr), _checkPower(false), _pmicFire(false) {}
+        TrackerShipping() :
+            _beginCallback(nullptr),
+            _ioCallback(nullptr),
+            _finalCallback(nullptr),
+            _checkPower(false),
+            _pmicFire(false) {}
         static TrackerShipping* _instance;
 
-        shipping_mode_shutdown_cb_t shutdown_cb;
+        ShippingModeCb _beginCallback;
+        ShippingModeCb _ioCallback;
+        ShippingModeCb _finalCallback;
         bool _checkPower;
         bool _pmicFire;
 
         int enter_cb(CloudServiceStatus status, JSONValue *root, const void *context);
-        static void shutdown();
+        void shutdown();
         static void pmicHandler();
 };

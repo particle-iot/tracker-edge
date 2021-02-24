@@ -73,7 +73,8 @@ Tracker::Tracker() :
     rgb(TrackerRGB::instance()),
     _model(TRACKER_MODEL_BARE_SOM),
     _variant(0),
-    last_loop_sec(0),
+    _lastLoopSec(0),
+    _canPowerEnabled(false),
     _pastWarnLimit(false),
     _evalTick(0),
     _lastBatteryCharging(false),
@@ -85,7 +86,7 @@ Tracker::Tracker() :
     _evalChargingTick(0),
     _batteryChargeEnabled(true)
 {
-    _config =
+    _cloudConfig =
     {
         .UsbCommandEnable = true,
     };
@@ -94,7 +95,7 @@ Tracker::Tracker() :
 int Tracker::registerConfig()
 {
     static ConfigObject tracker_config("tracker", {
-        ConfigBool("usb_cmd", &_config.UsbCommandEnable),
+        ConfigBool("usb_cmd", &_cloudConfig.UsbCommandEnable),
     });
     configService.registerModule(tracker_config);
 
@@ -150,10 +151,13 @@ int Tracker::enablePowerManagement() {
     return err;
 }
 
-void Tracker::initIo()
+void Tracker::enableIoCanPower(bool enable)
 {
-    // Initialize basic Tracker GPIO to known inactive values until they are needed later
+    digitalWrite(MCP_CAN_PWR_EN_PIN, (_canPowerEnabled = enable) ? HIGH : LOW);
+}
 
+int Tracker::initEsp32()
+{
     // ESP32 related GPIO
     pinMode(ESP32_BOOT_MODE_PIN, OUTPUT);
     digitalWrite(ESP32_BOOT_MODE_PIN, HIGH);
@@ -166,11 +170,16 @@ void Tracker::initIo()
     pinMode(ESP32_CS_PIN, OUTPUT);
     digitalWrite(ESP32_CS_PIN, HIGH);
 
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::initCan()
+{
     // CAN related GPIO
     pinMode(MCP_CAN_STBY_PIN, OUTPUT);
     digitalWrite(MCP_CAN_STBY_PIN, LOW);
     pinMode(MCP_CAN_PWR_EN_PIN, OUTPUT);
-    digitalWrite(MCP_CAN_PWR_EN_PIN, HIGH); // The CAN 5V power supply will be enabled for a short period
+    // Do not power the CAN interface on yet
     pinMode(MCP_CAN_RESETN_PIN, OUTPUT);
     digitalWrite(MCP_CAN_RESETN_PIN, HIGH);
     pinMode(MCP_CAN_INT_PIN, INPUT_PULLUP);
@@ -183,37 +192,29 @@ void Tracker::initIo()
     digitalWrite(MCP_CAN_RESETN_PIN, HIGH);
     delay(50);
 
+    digitalWrite(MCP_CAN_STBY_PIN, HIGH);
+
     // Initialize CAN device driver
     MCP_CAN can(MCP_CAN_CS_PIN, MCP_CAN_SPI_INTERFACE);
-    if (can.begin(MCP_RX_ANY, CAN_1000KBPS, MCP_20MHZ) != CAN_OK)
+    if (can.minimalInit() != CAN_OK)
     {
         Log.error("CAN init failed");
     }
-    Log.info("CAN status: 0x%x", can.getCANStatus());
-    if (can.setMode(MCP_MODE_NORMAL)) {
-        Log.error("CAN mode to NORMAL failed");
-    }
-    else {
-        Log.info("CAN mode to NORMAL");
-    }
-    delay(500);
 
-    // Set to standby
-    digitalWrite(MCP_CAN_STBY_PIN, HIGH);
-    digitalWrite(MCP_CAN_PWR_EN_PIN, LOW); // The CAN 5V power supply will now be disabled
-
-    for (int retries = CanSleepRetries; retries >= 0; retries--) {
-        auto stat = can.getCANStatus() & MCP_MODE_MASK;
-        if (stat == MCP_MODE_SLEEP) {
-            Log.info("CAN mode to SLEEP");
-            break;
-        }
-        // Retry setting the sleep mode
-        if (can.setMode(MCP_MODE_SLEEP)) {
-            Log.error("CAN mode not set to SLEEP");
-        }
-        delay(10);
+    if (_deviceConfig.enableIoCanPower()) {
+        enableIoCanPower(true);
     }
+
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::initIo()
+{
+    // Initialize basic Tracker GPIO to known inactive values until they are needed later
+    (void)initEsp32();
+    (void)initCan();
+
+    return SYSTEM_ERROR_NONE;
 }
 
 void Tracker::enableWatchdog(bool enable) {
@@ -231,6 +232,25 @@ void Tracker::enableWatchdog(bool enable) {
 #endif // RTC_WDT_DISABLE
 }
 
+void Tracker::startShippingMode() {
+    // Always let the sleep framework manage dependencies on power state changes
+    sleep.forceShutdown();
+}
+
+int Tracker::prepareSleep() {
+    if (_deviceConfig.enableIoCanPowerSleep()) {
+        enableIoCanPower(false);
+    }
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::prepareWake() {
+    if (_deviceConfig.enableIoCanPowerSleep() && _deviceConfig.enableIoCanPower()) {
+        enableIoCanPower(true);
+    }
+    return SYSTEM_ERROR_NONE;
+}
+
 void Tracker::startLowBatteryShippingMode() {
     if (sleep.isForcedShutdownPending()) {
         return;
@@ -239,7 +259,7 @@ void Tracker::startLowBatteryShippingMode() {
     // Publish then shutdown
     sleep.forcePublishVitals();
     location.triggerLocPub(Trigger::IMMEDIATE,"batt_low");
-    sleep.forceShutdown();
+    startShippingMode();
 }
 
 void Tracker::lowBatteryHandler(system_event_t event, int data) {
@@ -468,12 +488,8 @@ void Tracker::onSleepStateChange(TrackerSleepContext context)
     }
 }
 
-void Tracker::init()
+void Tracker::completeSetupDone()
 {
-    int ret = 0;
-
-    last_loop_sec = System.uptime();
-
     // mark setup as complete to skip mobile app commissioning flow
     uint8_t val = 0;
     if(!dct_read_app_data_copy(DCT_SETUP_DONE_OFFSET, &val, DCT_SETUP_DONE_SIZE) && val != 1)
@@ -481,6 +497,21 @@ void Tracker::init()
         val = 1;
         dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, DCT_SETUP_DONE_SIZE);
     }
+}
+
+void Tracker::startup()
+{
+    completeSetupDone();
+
+    // Correct power manager states in the DCT
+    enablePowerManagement();
+}
+
+int Tracker::init()
+{
+    int ret = 0;
+
+    _lastLoopSec = System.uptime();
 
 #ifndef TRACKER_MODEL_NUMBER
     ret = hal_get_device_hw_model(&_model, &_variant, nullptr);
@@ -502,7 +533,7 @@ void Tracker::init()
 #endif // TRACKER_MODEL_NUMBER
 
     // Initialize unused interfaces and pins
-    initIo();
+    (void)initIo();
 
     // Perform IO setup specific to Tracker One.  Reset the fuel gauge state-of-charge, check if under thresholds.
     if (_model == TRACKER_MODEL_TRACKERONE)
@@ -552,7 +583,13 @@ void Tracker::init()
     motion.init();
 
     shipping.init();
-    shipping.regShutdownCallback(std::bind(&Tracker::stop, this));
+    shipping.regShutdownBeginCallback(std::bind(&Tracker::stop, this));
+    shipping.regShutdownIoCallback(std::bind(&Tracker::end, this));
+    shipping.regShutdownFinalCallback(
+        [this](){
+            enableWatchdog(false);
+            return 0;
+        });
 
     rgb.init();
 
@@ -560,6 +597,8 @@ void Tracker::init()
     enableWatchdog(true);
 
     location.regLocGenCallback(loc_gen_cb);
+
+    return SYSTEM_ERROR_NONE;
 }
 
 void Tracker::loop()
@@ -567,9 +606,9 @@ void Tracker::loop()
     uint32_t cur_sec = System.uptime();
 
     // slow operations for once a second
-    if(last_loop_sec != cur_sec)
+    if(_lastLoopSec != cur_sec)
     {
-        last_loop_sec = cur_sec;
+        _lastLoopSec = cur_sec;
 
 #ifndef RTC_WDT_DISABLE
         rtc.reset_wdt();
@@ -609,12 +648,17 @@ void Tracker::loop()
     location.loop();
 }
 
-int Tracker::stop()
-{
+int Tracker::stop() {
     locationService.stop();
     motionService.stop();
 
-    return 0;
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::end() {
+    enableIoCanPower(false);
+
+    return SYSTEM_ERROR_NONE;
 }
 
 int Tracker::enableCharging() {

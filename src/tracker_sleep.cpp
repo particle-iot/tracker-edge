@@ -297,11 +297,6 @@ TrackerSleepResult TrackerSleep::sleep() {
     config.ble();
   }
 
-  // Disable watchdog
-  if (_watchdog) {
-    _watchdog(false);
-  }
-
   stopModem();
 
   TrackerSleepContext sleepNowContext = {
@@ -315,6 +310,13 @@ TrackerSleepResult TrackerSleep::sleep() {
 
   for (auto callback : _onSleep) {
     callback(sleepNowContext);
+  }
+
+  (void)Tracker::instance().prepareSleep();
+
+  // Disable watchdog
+  if (_watchdog) {
+    _watchdog(false);
   }
 
   // Perform the actual System sleep now
@@ -341,6 +343,8 @@ TrackerSleepResult TrackerSleep::sleep() {
   if (_watchdog) {
     _watchdog(true);
   }
+
+  (void)Tracker::instance().prepareWake();
 
   // Our loop count restarts to indicate that we are executing out of sleep
   _loopCount = 0;
@@ -585,7 +589,7 @@ int TrackerSleep::loop() {
           (millis() - _lastShutdownMs >= TrackerSleepShutdownTimeout)) {
         // Stop everything
         stopModem();
-        TrackerShipping::instance().enter(true);
+        Tracker::instance().startShippingMode();
         while (true) {}
       }
       break;
