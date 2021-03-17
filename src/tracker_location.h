@@ -27,6 +27,9 @@
 #define TRACKER_LOCATION_MIN_PUBLISH_DEFAULT (false)
 #define TRACKER_LOCATION_LOCK_TRIGGER (true)
 #define TRACKER_LOCATION_PROCESS_ACK (true)
+#define TRACKER_LOCATION_OFFLINE_STORAGE (true)
+#define TRACKER_LOCATION_OFFLINE_STORAGE_FILE ("/offline_location_points")
+#define TRACKER_LOCATION_DEFAULT_STORAGE (512)
 
 // wait at most this many seconds for a locked GPS location to become stable
 // before publishing regardless
@@ -42,6 +45,8 @@ struct tracker_location_config_t {
     bool min_publish;
     bool lock_trigger;
     bool process_ack;
+    bool offline_storage;
+    uint16_t kbytes_storage;
 };
 
 enum class Trigger {
@@ -141,7 +146,9 @@ class TrackerLocation
                 .interval_max_seconds = TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC,
                 .min_publish = TRACKER_LOCATION_MIN_PUBLISH_DEFAULT,
                 .lock_trigger = TRACKER_LOCATION_LOCK_TRIGGER,
-                .process_ack = TRACKER_LOCATION_PROCESS_ACK
+                .process_ack = TRACKER_LOCATION_PROCESS_ACK,
+                .offline_storage = TRACKER_LOCATION_OFFLINE_STORAGE,
+                .kbytes_storage = TRACKER_LOCATION_DEFAULT_STORAGE
             };
         }
         static TrackerLocation *_instance;
@@ -181,6 +188,8 @@ class TrackerLocation
         EvaluationResults evaluatePublish();
         void buildPublish(LocationPoint& cur_loc);
         GnssState loopLocation(LocationPoint& cur_loc);
+        int storeLocationToFile(const char* req_event);
+        int getLocationFromFile();
 
         uint32_t _last_location_publish_sec;
         uint32_t _monotonic_publish_sec;

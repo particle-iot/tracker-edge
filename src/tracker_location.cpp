@@ -22,6 +22,8 @@
 
 #include "config_service.h"
 #include "location_service.h"
+#include <fcntl.h>
+#include <sys/stat.h>
 
 TrackerLocation *TrackerLocation::_instance = nullptr;
 
@@ -103,7 +105,14 @@ void TrackerLocation::init()
                 &config_state.lock_trigger, &config_state_shadow.lock_trigger),
             ConfigBool("loc_ack",
                 config_get_bool_cb, config_set_bool_cb,
-                &config_state.process_ack, &config_state_shadow.process_ack)
+                &config_state.process_ack, &config_state_shadow.process_ack),
+            ConfigBool("offline_storage",
+                config_get_bool_cb, config_set_bool_cb,
+                &config_state.offline_storage, &config_state_shadow.offline_storage),
+            ConfigInt("offline_kbytes",
+                config_get_int32_cb, config_set_int32_cb,
+                &config_state.kbytes_storage, &config_state_shadow.kbytes_storage,
+                1, 4096l)
         },
         std::bind(&TrackerLocation::enter_location_config_cb, this, _1, _2),
         std::bind(&TrackerLocation::exit_location_config_cb, this, _1, _2, _3)
@@ -195,7 +204,13 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
         // only ever timeout
 
         // save on failure for retry
-        if(req_event && !location_publish_retry_str)
+        if(req_event && config_state.offline_storage)
+        {
+            if(storeLocationToFile(req_event) == (int)(strlen(req_event) + 1)) {
+                issue_callbacks = false;
+            }
+        }
+        else if(req_event && !location_publish_retry_str)
         {
             size_t len = strlen(req_event) + 1;
             location_publish_retry_str = (char *) malloc(len);
@@ -305,6 +320,67 @@ void TrackerLocation::disableGnss() {
 
 bool TrackerLocation::isSleepEnabled() {
     return !_sleep.isSleepDisabled();
+}
+
+int TrackerLocation::storeLocationToFile(const char* req_event) {
+    int fd = open(TRACKER_LOCATION_OFFLINE_STORAGE_FILE, O_WRONLY | O_CREAT | O_APPEND);
+    if(fd == -1) {
+        Log.error("File not open for writing");
+        return SYSTEM_ERROR_FILE;
+    }
+    struct stat buf;
+    int retval = fstat(fd, &buf);
+    if (retval == 0) {
+        if(buf.st_size < config_state.kbytes_storage*1024) {
+            uint16_t size = strlen(req_event)+1;
+            retval = write(fd, req_event, size);
+            Log.trace("Previous file size: %ld. Wrote %d bytes to file", buf.st_size, retval);
+            if (write(fd, (void *)&size, 2) == 2) {
+                retval+=2;
+            } else {
+                retval = SYSTEM_ERROR_FILE;
+            }
+        } else {
+            retval = SYSTEM_ERROR_TOO_LARGE;
+        }
+    } else {
+        retval = SYSTEM_ERROR_FILE;
+    }
+    close(fd);
+    return retval;
+}
+
+int TrackerLocation::getLocationFromFile() {
+    Log.info("Opening file: %s", TRACKER_LOCATION_OFFLINE_STORAGE_FILE);
+    int fd = open(TRACKER_LOCATION_OFFLINE_STORAGE_FILE, O_RDWR);
+    if(fd == -1) {
+        Log.error("File not found for reading");
+        return SYSTEM_ERROR_FILE;
+    }
+    if (lseek(fd, -2, SEEK_END) < 0) goto read_error;
+    uint16_t len;
+    if (read(fd, (void *)&len, 2) == -1) goto read_error;
+    Log.trace("Length of publish: %d", len);
+    if(!location_publish_retry_str) {
+        location_publish_retry_str = (char *) malloc(len);
+        if (location_publish_retry_str) {
+            if(lseek(fd, -2-len, SEEK_END) < 0) goto read_error;
+            if(read(fd, location_publish_retry_str, len) < len) goto read_error;
+            struct stat stat_buf;
+            if(fstat(fd, &stat_buf) == -1) goto read_error;
+            if(ftruncate(fd, stat_buf.st_size - len - 2) == -1) goto read_error;
+        } else {
+            Log.error("Failed to allocate memory for retry");
+            close(fd);
+            return SYSTEM_ERROR_NO_MEMORY;
+        }
+    }
+    close(fd);
+    return SYSTEM_ERROR_NONE;
+read_error:
+    Log.error("Error accessing file");
+    close(fd);
+    return SYSTEM_ERROR_FILE;
 }
 
 EvaluationResults TrackerLocation::evaluatePublish() {
@@ -629,7 +705,13 @@ void TrackerLocation::loop() {
 
     switch (publishReason.reason) {
         case PublishReason::NONE: {
-            // If there is nothing to do then get out
+            if (Particle.connected()) {
+                struct stat buf;
+                if(stat(TRACKER_LOCATION_OFFLINE_STORAGE_FILE, &buf) == 0 && buf.st_size > 2) {
+                    Log.trace("File size is %ld bytes", buf.st_size);
+                    if (getLocationFromFile() == SYSTEM_ERROR_NONE) location_publish();
+                }
+            }
             return;
         }
 
@@ -701,7 +783,7 @@ void TrackerLocation::loop() {
     //
 
     // then of any new publish
-    if(publishNow && Particle.connected())
+    if(publishNow && ( config_state.offline_storage || Particle.connected() ) )
     {
         if(location_publish_retry_str)
         {
