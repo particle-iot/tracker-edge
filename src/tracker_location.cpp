@@ -203,12 +203,11 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
         // once Particle Cloud passes if waiting on end-to-end it will
         // only ever timeout
 
-        // save on failure for retry
-        if(req_event && config_state.offline_storage)
+        // on failure, save to file if enabled. Save to RAM for retry if
+        // offline storage is not enabled, or it fails to store.
+        if(req_event && config_state.offline_storage && (storeLocationToFile(req_event) == (int)(strlen(req_event) + 3)) )
         {
-            if(storeLocationToFile(req_event) == (int)(strlen(req_event) + 1)) {
-                issue_callbacks = false;
-            }
+            issue_callbacks = false;
         }
         else if(req_event && !location_publish_retry_str)
         {
@@ -446,6 +445,20 @@ EvaluationResults TrackerLocation::evaluatePublish() {
             // timeout may be pre-empted when sleep enabled
             return EvaluationResults {PublishReason::TRIGGERS, true, (interval - min) < LockTimeoutSec};
         }
+    }
+
+    if (!networkNeeded) {
+        // If we have a file with saved loc points, and there's no min interval or
+        // we're past the min interval (either total or adjusted for early wake),
+        // then ask for network to turn on to publish the stored points.
+        struct stat buf;
+        if( (stat(TRACKER_LOCATION_OFFLINE_STORAGE_FILE, &buf) == 0 && buf.st_size > 2) &&
+            (!config_state.interval_min_seconds || (interval >= minNetwork || interval >= min)) ) 
+        {
+            Log.trace("%s cached loc", __FUNCTION__);
+            networkNeeded = true;
+        }
+
     }
 
     return EvaluationResults {PublishReason::NONE, networkNeeded, false};
@@ -705,14 +718,9 @@ void TrackerLocation::loop() {
 
     switch (publishReason.reason) {
         case PublishReason::NONE: {
-            if (Particle.connected()) {
-                struct stat buf;
-                if(stat(TRACKER_LOCATION_OFFLINE_STORAGE_FILE, &buf) == 0 && buf.st_size > 2) {
-                    Log.trace("File size is %ld bytes", buf.st_size);
-                    if (getLocationFromFile() == SYSTEM_ERROR_NONE) location_publish();
-                }
-            }
-            return;
+            // If there is nothing to do then break, to possibly go into publishing
+            // cached publishes if they exist.
+            break;
         }
 
         case PublishReason::TIME: {
@@ -820,6 +828,15 @@ void TrackerLocation::loop() {
         // from the cloud.  This leads to multiple event publishes meant to be the first publish.
         if (_first_publish && !_pending_first_publish) {
             _pending_first_publish = true;
+        }
+    }
+
+    // If there are no publishes, check for cached points to send to the cloud
+    if(!publishNow && Particle.connected()) {
+        struct stat buf;
+        if(stat(TRACKER_LOCATION_OFFLINE_STORAGE_FILE, &buf) == 0 && buf.st_size > 2) {
+            Log.trace("Publishing a cached loc. File size is %ld bytes", buf.st_size);
+            if (getLocationFromFile() == SYSTEM_ERROR_NONE) location_publish();
         }
     }
 }
