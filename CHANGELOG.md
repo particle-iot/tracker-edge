@@ -1,3 +1,29 @@
+## v12
+
+### COMPATIBILTY
+
+Must be built using device OS v3.0.0-rc.2 or greater.
+
+### FEATURES
+
+- Added enhanced location services (Location Fusion).
+- Added GNSS speed to location publishes.
+- Added dynamic charge current control over temperature.
+- [TRACKER ONE] Added IO/CAN power controls for configuration in application.
+
+### ENHANCEMENTS
+
+- Changed priorities of first and immediate publishes.
+- Reduced application footprint by migrating to wiring library mutexes.
+- Allow device OS to control battery charge enablement.
+
+### BUGFIXES
+
+- Fixed issue of default chip select SPI initialization effect on D5.
+- Fixed power management issue with incorrectly written DCT values.
+- Fixed issue with multiple publishes at boot.
+
+
 ## v11
 
 ### COMPATIBILTY
