@@ -313,12 +313,18 @@ void Tracker::batteryStateHandler(system_event_t event, int data) {
 
 
 void Tracker::initBatteryMonitor() {
-    SystemPowerConfiguration powerConfig;
-    // Start battery charging at low current state from boot then increase if nescessary
-    powerConfig.batteryChargeCurrent(TrackerChargeCurrentLow);
-    powerConfig.powerSourceMaxCurrent(TrackerInputCurrent);
-    auto ret = System.setPowerConfiguration(powerConfig);
-    Log.trace("tracker setPowerConfiguration = %d", ret);
+    auto powerConfig = System.getPowerConfiguration();
+    // Start battery charging at low current state from boot then increase if necessary
+    if ((powerConfig.batteryChargeCurrent() != TrackerChargeCurrentLow) ||
+        (powerConfig.powerSourceMaxCurrent() != TrackerInputCurrent)) {
+
+        powerConfig.batteryChargeCurrent(TrackerChargeCurrentLow);
+        powerConfig.powerSourceMaxCurrent(TrackerInputCurrent);
+        System.setPowerConfiguration(powerConfig);
+    }
+
+    // Keep a handy variable to check on battery charge enablement
+    _batteryChargeEnabled = !powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING);
 
     // To initialize the fuel gauge so that it provides semi-accurate readings we
     // want to ensure that the charging circuit is off when providing the
@@ -346,23 +352,10 @@ void Tracker::initBatteryMonitor() {
 }
 
 bool Tracker::getChargeEnabled() {
-    auto chargeStatus = (PMIC().readPowerONRegister() >> 4) & 0b11; // Mask on bits 4 and 5
-    return (chargeStatus != 0b00);
+    return !System.getPowerConfiguration().isFeatureSet(SystemPowerFeature::DISABLE_CHARGING);
 }
 
 void Tracker::evaluateBatteryCharge() {
-    // Manage charge enablement/disablement workaround
-    unsigned int evalChargingInterval = sleep.isSleepDisabled() ? TrackerChargingAwakeEvalTime : TrackerChargingSleepEvalTime;
-    if (System.uptime() - _evalChargingTick > evalChargingInterval) {
-        auto chargeEnabled = getChargeEnabled();
-        if (!chargeEnabled && _batteryChargeEnabled) {
-            enableCharging();
-        }
-        else if (chargeEnabled && !_batteryChargeEnabled) {
-            disableCharging();
-        }
-    }
-
     // This is delayed intialization for the fuel gauge threshold since power on
     // events may glitch between battery states easily.
     if (_delayedBatteryCheck) {
@@ -467,14 +460,6 @@ void Tracker::onSleep(TrackerSleepContext context)
 void Tracker::onWake(TrackerSleepContext context)
 {
     if (_model == TRACKER_MODEL_TRACKERONE) {
-        // Battery charge enable/disable enforcement upon wake in case the Power Manager overrides the setting
-        if (_batteryChargeEnabled) {
-            enableCharging();
-        }
-        else {
-            disableCharging();
-        }
-
         GnssLedEnable(true);
         // Ensure battery evaluation starts immediately after waking
         _evalTick = 0;
@@ -662,49 +647,74 @@ int Tracker::end() {
 }
 
 int Tracker::enableCharging() {
-    PMIC pmic(true);
     _batteryChargeEnabled = true;
-    return (pmic.enableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
+
+    auto powerConfig = System.getPowerConfiguration();
+    if (powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING)) {
+        powerConfig.clearFeature(SystemPowerFeature::DISABLE_CHARGING);
+        return System.setPowerConfiguration(powerConfig);
+    }
+
+    return SYSTEM_ERROR_NONE;
 }
 
 int Tracker::disableCharging() {
-    PMIC pmic(true);
     _batteryChargeEnabled = false;
-    return (pmic.disableCharging()) ? SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
+
+    auto powerConfig = System.getPowerConfiguration();
+    if (!powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING)) {
+        powerConfig.feature(SystemPowerFeature::DISABLE_CHARGING);
+        return System.setPowerConfiguration(powerConfig);
+    }
+
+    return SYSTEM_ERROR_NONE;
 }
 
 int Tracker::setChargeCurrent(uint16_t current) {
-    SystemPowerConfiguration powerConfig;
-    powerConfig.batteryChargeCurrent(current);
-    auto ret = System.setPowerConfiguration(powerConfig);
-    return (ret) ?  SYSTEM_ERROR_NONE : SYSTEM_ERROR_IO;
+    int ret = SYSTEM_ERROR_NONE;
+    auto powerConfig = System.getPowerConfiguration();
+    if (powerConfig.batteryChargeCurrent() != current) {
+        powerConfig.batteryChargeCurrent(current);
+        ret = System.setPowerConfiguration(powerConfig);
+    }
+    return ret;
 }
 
 int Tracker::chargeCallback(TemperatureChargeEvent event) {
+    auto shouldCharge = true;
+
     switch (event) {
         case TemperatureChargeEvent::NORMAL: {
             setChargeCurrent(TrackerChargeCurrentHigh);
-            enableCharging();
+            shouldCharge = true;
             break;
         }
 
         case TemperatureChargeEvent::OVER_CHARGE_REDUCTION: {
             setChargeCurrent(TrackerChargeCurrentLow);
-            enableCharging();
+            shouldCharge = true;
             break;
         }
 
         case TemperatureChargeEvent::OVER_TEMPERATURE: {
             setChargeCurrent(TrackerChargeCurrentLow);
-            disableCharging();
+            shouldCharge = false;
             break;
         }
 
         case TemperatureChargeEvent::UNDER_TEMPERATURE: {
             setChargeCurrent(TrackerChargeCurrentLow);
-            disableCharging();
+            shouldCharge = false;
             break;
         }
+    }
+
+    // Check if anything needs to be changed for charging
+    if (!shouldCharge && _batteryChargeEnabled) {
+        disableCharging();
+    }
+    else if (shouldCharge && !_batteryChargeEnabled) {
+        enableCharging();
     }
 
     return SYSTEM_ERROR_NONE;
