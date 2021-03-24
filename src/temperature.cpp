@@ -351,10 +351,10 @@ void evaluate_charge_temperature(float temperature) {
       if (isTempLow) {
         chargeTempState = toChargeState(TempChargeState::UNDER_TEMPERATURE);
       }
-      else if (isTempReducedA) {
+      else if (isTempBelowHighHyst && isTempReducedA) {
         chargeTempState = toChargeState(TempChargeState::OVER_CHARGE_REDUCTION);
       }
-      else if (isTempBelowHighHyst) {
+      else if (isTempReducedAHyst) {
         chargeTempState = toChargeState(TempChargeState::NORMAL);
       }
 
