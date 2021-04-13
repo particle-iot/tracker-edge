@@ -15,7 +15,7 @@
  */
 
 #include "tracker_sleep.h"
-#include "config_service.h"
+#include "cloud_service.h"
 #include "tracker_location.h"
 #include "tracker.h"
 
@@ -26,6 +26,19 @@ TrackerSleep *TrackerSleep::_instance = nullptr;
 
 void TrackerSleep::handleOta(system_event_t event, int param) {
   TrackerSleep::instance().pauseSleep();
+}
+
+int TrackerSleep::enterReset() {
+  auto deferredReset = new Timer(TrackerSleepResetTimerDelay, [this]() { System.reset(); }, true);
+  deferredReset->start();
+
+  return SYSTEM_ERROR_NONE;
+}
+
+int TrackerSleep::handleReset(CloudServiceStatus status, JSONValue *root, const void *context) {
+  _pendingReset = true;
+
+  return 0;
 }
 
 int TrackerSleep::init(SleepWatchdogCallback watchdog) {
@@ -55,6 +68,9 @@ int TrackerSleep::init(SleepWatchdogCallback watchdog) {
 
   // Register callback to be alerted when there is a publish
   TrackerLocation::instance().regLocGenCallback([this](JSONWriter& writer, LocationPoint &loc, const void *context){annoucePublish();});
+
+  // Register 'reset' command from the cloud
+  CloudService::instance().regCommandCallback("reset", &TrackerSleep::handleReset, this);
 
   return SYSTEM_ERROR_NONE;
 }
@@ -445,6 +461,25 @@ void TrackerSleep::stateToShutdown() {
   _lastShutdownMs = millis();
 }
 
+void TrackerSleep::stateToReset() {
+  _executionState = TrackerExecutionState::RESET;
+
+  TrackerSleepContext stateContext = {
+    .reason = TrackerSleepReason::STATE_TO_RESET,
+    .loop = _loopCount,
+    .lastSleepMs = _lastSleepMs,
+    .lastWakeMs = _lastWakeMs,
+    .nextWakeMs = 0,
+    .modemOnMs = _lastModemOnMs,
+  };
+
+  for (auto callback : _onStateTransition) {
+    callback(stateContext);
+  }
+
+  _lastResetMs = millis();
+}
+
 int TrackerSleep::loop() {
 
   // Perform state operations and transitions
@@ -521,6 +556,10 @@ int TrackerSleep::loop() {
           Log.trace("EXECUTE time expired and transitioning to SHUTDOWN");
           stateToShutdown();
         }
+        else if (_pendingReset) {
+          Log.trace("EXECUTE time expired and transitioning to RESET");
+          stateToReset();
+        }
 
         if (!_holdSleep &&
             (System.uptime() - _lastExecuteSec >= _executeDurationSec)) {
@@ -540,6 +579,9 @@ int TrackerSleep::loop() {
 
         if (_pendingShutdown) {
           stateToShutdown();
+        }
+        else if (_pendingReset) {
+          stateToReset();
         }
       }
 
@@ -590,6 +632,26 @@ int TrackerSleep::loop() {
         // Stop everything
         stopModem();
         TrackerShipping::instance().enter(true);
+        while (true) {}
+      }
+      break;
+    }
+
+    /* ----------------------------------------------------------------------------------------------------------------
+     * RESET state
+     * This state is only entered from the EXECUTE state and can only transition to RESET states.
+     *
+     * The purpose of this state is to start a system reset with graceful disconnect.
+     *-----------------------------------------------------------------------------------------------------------------
+     */
+    case TrackerExecutionState::RESET: {
+      if (_pendingPublishVitals && Particle.connected()) {
+        _pendingPublishVitals = false;
+        Particle.publishVitals();
+      }
+      if ((_publishFlag && Particle.connected()) ||
+          (millis() - _lastResetMs >= TrackerSleepResetTimeout)) {
+        enterReset();
         while (true) {}
       }
       break;

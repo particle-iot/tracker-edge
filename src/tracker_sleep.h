@@ -18,6 +18,7 @@
 
 #include "Particle.h"
 #include "tracker_config.h"
+#include "config_service.h"
 
 
 /**
@@ -37,6 +38,8 @@ constexpr int32_t TrackerSleepDefaultConnMaxTime = 90; // seconds
 constexpr int32_t TrackerSleepDefaultMaxTime = 86400; // seconds
 constexpr system_tick_t TrackerSleepGracefulTimeout = 5 * 1000; // milliseconds
 constexpr system_tick_t TrackerSleepShutdownTimeout = 4 * 1000; // milliseconds
+constexpr system_tick_t TrackerSleepResetTimeout = 5 * 1000; // milliseconds
+constexpr unsigned int TrackerSleepResetTimerDelay = 5 * 1000; // milliseconds
 
 struct tracker_sleep_config_t {
     TrackerSleepMode mode;
@@ -68,6 +71,7 @@ enum class TrackerSleepReason {
   STATE_TO_EXECUTION,             /**< Sleep transition to EXECUTION */
   STATE_TO_SLEEP,                 /**< Sleep transition to SLEEP */
   STATE_TO_SHUTDOWN,              /**< Sleep transition to SHUTDOWN */
+  STATE_TO_RESET,                 /**< Sleep transition to RESET */
 };
 
 /**
@@ -114,6 +118,7 @@ enum class TrackerExecutionState {
   EXECUTION,
   SLEEP,
   SHUTDOWN,
+  RESET,
 };
 
 /**
@@ -444,6 +449,7 @@ private:
     _holdSleep(false),
     _pendingPublishVitals(false),
     _pendingShutdown(false),
+    _pendingReset(false),
     _executionState(TrackerExecutionState::BOOT),
     _lastConnectingSec(0),
     _lastExecuteSec(0),
@@ -483,6 +489,23 @@ private:
    * @param param
    */
   static void handleOta(system_event_t event, int param);
+
+  /**
+   * @brief Instruct TrackerSleep to reset.
+   *
+   * @retval SYSTEM_ERROR_NONE
+   */
+  int enterReset();
+
+  /**
+   * @brief Cloud callback to handle system reset
+   *
+   * @param status
+   * @param root Passed object
+   * @param context Usually this*
+   * @return int Success (zero)
+   */
+  int handleReset(CloudServiceStatus status, JSONValue *root, const void *context);
 
   /**
    * @brief Schedules system wake at specific time in relation to System.millis().
@@ -527,6 +550,12 @@ private:
   void stateToShutdown();
 
   /**
+   * @brief Transition to RESET state
+   *
+   */
+  void stateToReset();
+
+  /**
    * @brief Power the cellular modem on
    *
    */
@@ -568,11 +597,13 @@ private:
   bool _holdSleep;
   bool _pendingPublishVitals;
   bool _pendingShutdown;
+  bool _pendingReset;
   TrackerExecutionState _executionState;
   uint32_t _lastConnectingSec;
   uint32_t _lastExecuteSec;
   uint32_t _executeDurationSec;
   system_tick_t _lastShutdownMs;
+  system_tick_t _lastResetMs;
   uint64_t _nextWakeMs;
   uint64_t _lastWakeMs;
   uint64_t _lastRequestedWakeMs;
