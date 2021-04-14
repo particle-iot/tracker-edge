@@ -642,6 +642,7 @@ int Tracker::stop() {
 
 int Tracker::end() {
     enableIoCanPower(false);
+    GnssLedEnable(false);
 
     return SYSTEM_ERROR_NONE;
 }
