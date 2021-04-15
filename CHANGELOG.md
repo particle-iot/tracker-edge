@@ -1,3 +1,23 @@
+## v13
+
+### COMPATIBILTY
+
+Must be built using device OS v3.0.0-rc.2 or greater.
+
+### FEATURES
+
+- Added reset command from cloud.
+
+### ENHANCEMENTS
+
+- Updated ublox GNSS drivers to allow UDR model changes.
+
+### BUGFIXES
+
+- Increased I2C timeouts for the AM1805 RTC driver as a precaution against crashes.
+- [TRACKER ONE] Fixed GNSS LED state to make sure it is off when going into shipping mode.
+
+
 ## v12
 
 ### COMPATIBILTY
