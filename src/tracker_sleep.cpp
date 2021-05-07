@@ -298,7 +298,8 @@ TrackerSleepResult TrackerSleep::sleep() {
   }
 
   config.mode(SystemSleepMode::ULTRA_LOW_POWER)
-    .gpio(PMIC_INT, FALLING);   // Always detect power events
+    .gpio(PMIC_INT, FALLING)    // Always detect power events
+    .gpio(LOW_BAT_UC, FALLING); // Keep fuel gauge awake
 
   // Accumulate all of the pin sources for wake
   for (auto pin : _onPin) {
