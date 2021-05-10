@@ -1,3 +1,22 @@
+## v14
+
+### COMPATIBILTY
+
+Must be built using device OS v3.0.0-rc.2 or greater.
+
+### FEATURES
+
+No new features.
+
+### ENHANCEMENTS
+
+No new enhancements.
+
+### BUGFIXES
+
+- Fuel gauge reports incorrect battery charge during sleep.
+
+
 ## v13
 
 ### COMPATIBILTY
