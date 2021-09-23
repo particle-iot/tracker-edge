@@ -56,6 +56,7 @@
 #define UBLOX_SPI_INTERFACE                   (SPI1)
 #define UBLOX_CS_PIN                          (GPS_CS)
 #define UBLOX_PWR_EN_PIN                      (GPS_PWR)
+#define UBLOX_RESETN_PIN                      (GPS_RST)
 #define UBLOX_TX_READY_MCU_PIN                (GPS_INT)
 #define UBLOX_TX_READY_GPS_PIN                (14) // PIO 14 is EXTINT on GPS Module
 

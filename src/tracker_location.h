@@ -48,37 +48,37 @@ enum class RadioAccessTechnology {
 };
 
 struct CellularServing {
-	RadioAccessTechnology rat;
-	unsigned int mcc;       // 0-999
-	unsigned int mnc;       // 0-999
-	uint32_t cellId;        // 28-bits
-	unsigned int tac;       // 16-bits
-	int signalPower;
+    RadioAccessTechnology rat;
+    unsigned int mcc;       // 0-999
+    unsigned int mnc;       // 0-999
+    uint32_t cellId;        // 28-bits
+    unsigned int tac;       // 16-bits
+    int signalPower;
 
-	CellularServing() :
-		rat(RadioAccessTechnology::NONE),
-		mcc(0),
-		mnc(0),
-		cellId(0),
-		tac(0),
-		signalPower(0) {}
+    CellularServing() :
+        rat(RadioAccessTechnology::NONE),
+        mcc(0),
+        mnc(0),
+        cellId(0),
+        tac(0),
+        signalPower(0) {}
 };
 
 struct CellularNeighbors {
-	RadioAccessTechnology rat;
-	uint32_t earfcn;		// 28-bits
-	uint32_t neighborId;	// 0-503
-	int signalQuality;
-	int signalPower;
-	int signalStrength;
+    RadioAccessTechnology rat;
+    uint32_t earfcn;        // 28-bits
+    uint32_t neighborId;    // 0-503
+    int signalQuality;
+    int signalPower;
+    int signalStrength;
 
-	CellularNeighbors() :
-		rat(RadioAccessTechnology::NONE),
-		earfcn(0),
-		neighborId(0),
-		signalQuality(0),
-		signalPower(0),
-		signalStrength(0) {}
+    CellularNeighbors() :
+        rat(RadioAccessTechnology::NONE),
+        earfcn(0),
+        neighborId(0),
+        signalQuality(0),
+        signalPower(0),
+        signalStrength(0) {}
 };
 
 struct tracker_location_config_t {
@@ -194,6 +194,7 @@ class TrackerLocation
             _pending_immediate(false),
             _first_publish(true),
             _pending_first_publish(false),
+            _pendingShutdown(false),
             _earlyWake(0),
             _nextEarlyWake(0),
             location_publish_retry_str(nullptr),
@@ -201,8 +202,8 @@ class TrackerLocation
             _newMonotonic(true),
             _firstLockSec(0),
             _gnssStartedSec(0),
-            _lastGnssState(GnssState::OFF)
-        {
+            _lastGnssState(GnssState::OFF) {
+
             _config_state = {
                 .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
                 .interval_max_seconds = TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC,
@@ -228,6 +229,7 @@ class TrackerLocation
         bool _pending_immediate;
         bool _first_publish;
         bool _pending_first_publish;
+        bool _pendingShutdown;
         unsigned int _earlyWake;
         unsigned int _nextEarlyWake;
 
@@ -248,15 +250,13 @@ class TrackerLocation
         void enableNetwork();
         void enableGnss();
         void disableGnss();
-        void enableWifi();
-        void disableWifi();
         void onSleepPrepare(TrackerSleepContext context);
         void onSleep(TrackerSleepContext context);
         void onSleepCancel(TrackerSleepContext context);
         void onWake(TrackerSleepContext context);
         void onSleepState(TrackerSleepContext context);
-        EvaluationResults evaluatePublish();
-        void buildPublish(LocationPoint& cur_loc);
+        EvaluationResults evaluatePublish(bool error);
+        void buildPublish(LocationPoint& cur_loc, bool error = false);
         GnssState loopLocation(LocationPoint& cur_loc);
         static int parseServeCell(const char* in, CellularServing& out);
         size_t buildTowerInfo(JSONBufferWriter& writer, size_t size);

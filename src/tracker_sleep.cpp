@@ -29,7 +29,11 @@ void TrackerSleep::handleOta(system_event_t event, int param) {
 }
 
 int TrackerSleep::enterReset() {
-  auto deferredReset = new Timer(TrackerSleepResetTimerDelay, [this]() { System.reset(); }, true);
+  auto deferredReset = new Timer(TrackerSleepResetTimerDelay, [this]() {
+    LocationService::instance().stop();
+    delay(1000);
+    System.reset();
+  }, true);
   deferredReset->start();
 
   return SYSTEM_ERROR_NONE;

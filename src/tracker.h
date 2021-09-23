@@ -63,7 +63,8 @@ public:
      */
     TrackerConfiguration() :
         _enableIo(true),
-        _enableIoSleep(false) {
+        _enableIoSleep(false),
+        _enableFastLock(false) {
 
     }
 
@@ -115,18 +116,41 @@ public:
         return _enableIoSleep;
     }
 
+    /**
+     * @brief Enable or disable faster GNSS lock based on HDOP.  May result in poor horizontal accuracy.
+     *
+     * @param enable Use faster method for GNSS lock state
+     * @return TrackerConfiguration&
+     */
+    TrackerConfiguration& enableFastLock(bool enable) {
+        _enableFastLock = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if faster GNSS lock based on HDOP is enabled.
+     *
+     * @return true Faster GNSS lock is enabled
+     * @return false Faster GNSS lock is disabled
+     */
+    bool enableFastLock() const {
+        return _enableFastLock;
+    }
+
     TrackerConfiguration& operator=(const TrackerConfiguration& rhs) {
         if (this == &rhs) {
             return *this;
         }
         this->_enableIo = rhs._enableIo;
         this->_enableIoSleep = rhs._enableIoSleep;
+        this->_enableFastLock = rhs._enableFastLock;
 
         return *this;
     }
 private:
     bool _enableIo;
     bool _enableIoSleep;
+    bool _enableFastLock;
 };
 
 // this class encapsulates the underlying modules and builds on top of them to
@@ -200,6 +224,26 @@ class Tracker {
          */
         uint32_t getVariant() const {
             return _variant;
+        }
+
+        /**
+         * @brief Set the GNSS fast lock
+         *
+         * @param enable Enable faster GNSS lock
+         */
+        void setFastLock(bool enable) {
+            _deviceConfig.enableFastLock(enable);
+            locationService.setFastLock(enable);
+        }
+
+        /**
+         * @brief Get the GNSS fast lock
+         *
+         * @return true Faster GNSS lock is enabled
+         * @return false Faster GNSS lock is disabled
+         */
+        bool getFastLock() const {
+            return locationService.getFastLock();;
         }
 
         /**

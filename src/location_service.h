@@ -23,23 +23,23 @@
 
 /**
  * @brief Type of location point structure
- * 
+ *
  */
 enum class LocationType {
-	NONE,                           /**< Initial and default type */
-	DEVICE,                         /**< Location point came from the device */
-	CLOUD,                          /**< Location point came from the cloud */
+    NONE,                           /**< Initial and default type */
+    DEVICE,                         /**< Location point came from the device */
+    CLOUD,                          /**< Location point came from the cloud */
 };
 
 /**
  * @brief Location source for coordinate
- * 
+ *
  */
 enum class LocationSource {
-	NONE,                           /**< Initial and default source */
-	CELL,                           /**< Geocoordinate sourced from cellular towers */
-	WIFI,                           /**< Geocoordinate sourced from WiFi access points */
-	GNSS,                           /**< Geocoordinate sourced from GNSS satellites */
+    NONE,                           /**< Initial and default source */
+    CELL,                           /**< Geocoordinate sourced from cellular towers */
+    WIFI,                           /**< Geocoordinate sourced from WiFi access points */
+    GNSS,                           /**< Geocoordinate sourced from GNSS satellites */
 };
 
 /**
@@ -60,8 +60,8 @@ enum class LocationTimescale {
  *
  */
 struct LocationPoint {
-    LocationType type;				/**< Type of location point */
-    Vector<LocationSource> sources;	/**< List of location sources sorted by highest accuracy */
+    LocationType type;              /**< Type of location point */
+    Vector<LocationSource> sources; /**< List of location sources sorted by highest accuracy */
     int locked;                     /**< Indication of GNSS locked status */
     unsigned int lockedDuration;    /**< Duration of the current GNSS lock (if applicable) */
     bool stable;                    /**< Indication if GNNS lock is stable (if applicable) */
@@ -73,7 +73,9 @@ struct LocationPoint {
     float speed;                    /**< Point speed in meters per second */
     float heading;                  /**< Point heading in degrees */
     float horizontalAccuracy;       /**< Point horizontal accuracy in meters */
+    float horizontalDop;            /**< Point horizontal dilution of precision */
     float verticalAccuracy;         /**< Point vertical accuracy in meters */
+    float verticalDop;              /**< Point vertical dilution of precision */
 };
 
 /**
@@ -89,6 +91,7 @@ struct PointThreshold {
 struct LocationStatus {
     int powered;                    /**< Indication of GNSS power status */
     int locked;                     /**< Indication of GNSS locked status */
+    int error;                      /**< Indication of GNSS module error */
 };
 
 /**
@@ -101,6 +104,7 @@ public:
     static constexpr system_tick_t LOCATION_EVENTS_DEFAULT = 32;
     static constexpr system_tick_t LOCATION_STARTUP_PERIOD_DEFAULT = 1*1000; // One second
     static constexpr system_tick_t LOCATION_LOCK_PERIOD_DEFAULT = 1*1000; // One second
+    static constexpr double LOCATION_LOCK_HDOP_MAX_DEFAULT = 20.0;
 
     /**
      * @brief Return instance of the LocationService
@@ -119,24 +123,37 @@ public:
     /**
      * @brief Initialize the location service
      *
-     * @param spi SPI bus instance
-     * @param chipSelectPin SPI chip select pin
-     * @param powerEnablePin Device power enable pin
      * @retval SYSTEM_ERROR_NONE
      * @retval SYSTEM_ERROR_INVALID_STATE
      * @retval SYSTEM_ERROR_INTERNAL
      * @retval SYSTEM_ERROR_INVALID_ARGUMENT
      * @retval SYSTEM_ERROR_IO
      */
-    int begin(SPIClass& spi, uint16_t chipSelectPin, uint16_t powerEnablePin, uint16_t txReadyMCUPin=PIN_INVALID, uint16_t txReadyGPSPin=PIN_INVALID);
+    int begin(bool fastLock = false);
+
+    /**
+     * @brief Set the GNSS fast lock
+     *
+     * @param enable Enable faster GNSS lock
+     */
+    void setFastLock(bool enable);
+
+    /**
+     * @brief Get the GNSS fast lock
+     *
+     * @return true Faster GNSS lock is enabled
+     * @return false Faster GNSS lock is disabled
+     */
+    bool getFastLock();
 
     /**
      * @brief Start the location service
      *
+     * @param  restart Optional flag to restart the module
      * @retval SYSTEM_ERROR_NONE
      * @retval SYSTEM_ERROR_INVALID_STATE
      */
-    int start();
+    int start(bool restart = false);
 
     /**
      * @brief Stop the location service
@@ -257,4 +274,5 @@ private:
     ubloxGPS* gps_;
     PointThreshold pointThreshold_;
     bool pointThresholdConfigured_;
+    bool fastGnssLock_;
 };

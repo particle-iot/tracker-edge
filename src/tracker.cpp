@@ -540,22 +540,17 @@ int Tracker::init()
     // Register our own configuration settings
     registerConfig();
 
-    ret = locationService.begin(UBLOX_SPI_INTERFACE,
-        UBLOX_CS_PIN,
-        UBLOX_PWR_EN_PIN,
-        UBLOX_TX_READY_MCU_PIN,
-        UBLOX_TX_READY_GPS_PIN);
+    ret = locationService.begin(_deviceConfig.enableFastLock());
     if (ret)
     {
         Log.error("Failed to begin location service");
     }
 
-    locationService.start();
-
     // Check for Tracker One hardware
     if (_model == TRACKER_MODEL_TRACKERONE)
     {
         (void)GnssLedInit();
+        GnssLedEnable(true);
         temperature_init(TRACKER_THERMISTOR,
             [this](TemperatureChargeEvent event){ return chargeCallback(event); }
         );

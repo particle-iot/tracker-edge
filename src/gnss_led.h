@@ -23,3 +23,4 @@ constexpr system_tick_t GNSS_LED_CONTROL_BLINK_PERIOD_MS = 250;
 
 int GnssLedInit();
 void GnssLedEnable(bool enable);
+void GnssLedError();
