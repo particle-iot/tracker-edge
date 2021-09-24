@@ -1,3 +1,27 @@
+## v15
+
+### COMPATIBILTY
+
+Must be built using device OS v3.0.0 or greater.
+
+### FEATURES
+
+- Additional setting for GNSS lock stability criteria based on HDOP rather than using existing horizonatal accuracy.
+- Both HDOP and VDOP figures were added to outgoing location publishes.
+
+### ENHANCEMENTS
+
+- The CAN bus library can be initialized in listen-only mode.
+- GPS ublox driver changes to detect errors during initialization and return immediately upon such errors.
+- An additional trigger named "err" will be sent in location publishes if GNSS module errors are encountered.
+- [TRACKER ONE] The GPS LED will flash rapidly if GNSS module errors are encountered.
+- WiFi scanning time has been shortened in order to reduce power usage.
+
+### BUGFIXES
+
+- GNSS module power on and off sequence changes for modules that may power up in the wrong interface configuration.
+
+
 ## v14
 
 ### COMPATIBILTY
