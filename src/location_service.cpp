@@ -121,12 +121,13 @@ int LocationService::start(bool restart) {
 
 int LocationService::stop() {
     CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
+    int ret = SYSTEM_ERROR_NONE;
 
     if (gps_->isOn()) {
-        gps_->off();
+        ret = gps_->off();
     }
 
-    return SYSTEM_ERROR_NONE;
+    return ret;
 }
 
 int LocationService::getLocation(LocationPoint& point) {

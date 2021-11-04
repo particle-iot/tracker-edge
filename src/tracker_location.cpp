@@ -89,7 +89,7 @@ int TrackerLocation::get_loc_cb(CloudServiceStatus status,
    return 0;
 }
 
-void TrackerLocation::init()
+void TrackerLocation::init(unsigned int gnssRetries)
 {
     static ConfigObject location_desc
     (
@@ -149,6 +149,9 @@ void TrackerLocation::init()
     _sleep.registerStateChange([this](TrackerSleepContext context){ this->onSleepState(context); });
 
     CloudService::instance().regCommandCallback("loc-enhanced", &TrackerLocation::enhanced_cb, this);
+
+    _gnssRetryDefault = gnssRetries;
+    setGnssCycle();
 }
 
 int TrackerLocation::buildEnhLocation(JSONValue& node, LocationPoint& point) {
@@ -415,13 +418,17 @@ void TrackerLocation::enableNetwork() {
     _sleep.forceFullWakeCycle();
 }
 
-void TrackerLocation::enableGnss() {
-    LocationService::instance().start();
+int TrackerLocation::enableGnss() {
+    auto ret = LocationService::instance().start();
+    if (SYSTEM_ERROR_NONE != ret) {
+        decGnssCycle();
+    }
     _gnssStartedSec = System.uptime();
+    return ret;
 }
 
-void TrackerLocation::disableGnss() {
-    LocationService::instance().stop();
+int TrackerLocation::disableGnss() {
+    return LocationService::instance().stop();
 }
 
 bool TrackerLocation::isSleepEnabled() {
@@ -578,9 +585,7 @@ void TrackerLocation::onWake(TrackerSleepContext context) {
 
     if (result.networkNeeded) {
         enableNetwork();
-        if (_config_state_loop_safe.gnss) {
-            enableGnss();
-        }
+        // GNSS power state handled elsewhere
         Log.trace("%s needs to start the network", __FUNCTION__);
     }
     else {
@@ -943,27 +948,20 @@ void TrackerLocation::loop() {
     _loopSampleTick = millis();
 
     // Sync power state changes
-    tracker_location_config_t captureConfig = _config_state;
+    // The rest of this loop will depend on a constant setting for GNSS and WiFi condif state
+    _config_state_loop_safe = _config_state;
 
     if (firstLoop) {
-        if (captureConfig.gnss) {
-            enableGnss();
-        }
-    }
-    else {
-        LocationStatus gnssPoweredStatus;
-        LocationService::instance().getStatus(gnssPoweredStatus);
-        if (captureConfig.gnss && !gnssPoweredStatus.error) {
-            // This will be called repeatedly upon GNSS module errors
-            enableGnss();
-        }
-        else if (!captureConfig.gnss) {
-            disableGnss();
-        }
+        setGnssCycle();
     }
 
-    // The rest of this loop will depend on a constant setting for GNSS and WiFi condif state
-    _config_state_loop_safe = captureConfig;
+    if (_config_state_loop_safe.gnss && _sleep.isFullWakeCycle() && (0 != getGnssCycle())) {
+        // This is safe to call repeatedly
+        enableGnss();
+    } else  if (!_config_state_loop_safe.gnss){
+        // This is safe to call repeatedly
+        disableGnss();
+    }
 
     // First take care of any retry attempts of last loc
     if (location_publish_retry_str && Particle.connected()) {
@@ -975,6 +973,11 @@ void TrackerLocation::loop() {
     LocationPoint cur_loc = {};
     auto locationStatus = loopLocation(cur_loc);
 
+    // Override the location status if still retrying
+    if ((GnssState::ERROR == locationStatus) && (0 != getGnssCycle())) {
+        locationStatus = GnssState::ON_UNLOCKED;
+    }
+
     // Perform interval evaluation
     auto publishReason = evaluatePublish(GnssState::ERROR == locationStatus);
 
@@ -985,7 +988,6 @@ void TrackerLocation::loop() {
     }
 
     bool publishNow = false;
-    bool isError = false;
 
     //                                   : NONE      TIME        TRIG        IMM
     //                                    ----------------------------------------
@@ -1005,8 +1007,6 @@ void TrackerLocation::loop() {
         case PublishReason::TIME: {
             switch (locationStatus) {
                 case GnssState::ERROR:
-                    // GNSS errors are handled specially when reporting as a trigger
-                    isError = true;
                 // fall through
                 case GnssState::DISABLED:
                 // fall through
@@ -1038,8 +1038,6 @@ void TrackerLocation::loop() {
         case PublishReason::TRIGGERS: {
             switch (locationStatus) {
                 case GnssState::ERROR:
-                    // GNSS errors are handled specially when reporting as a trigger
-                    isError = true;
                 // fall through
                 case GnssState::DISABLED:
                 // fall through
@@ -1069,12 +1067,6 @@ void TrackerLocation::loop() {
         }
 
         case PublishReason::IMMEDIATE: {
-            switch (locationStatus) {
-                case GnssState::ERROR:
-                    // GNSS errors are handled specially when reporting as a trigger
-                    isError = true;
-                    break;
-            }
             Log.trace("publishing from immediate");
             _pending_immediate = false;
             publishNow = true;
@@ -1100,7 +1092,7 @@ void TrackerLocation::loop() {
             location_publish_retry_str = nullptr;
         }
         Log.info("publishing now...");
-        buildPublish(cur_loc, isError);
+        buildPublish(cur_loc, (0 == getGnssCycle()));
         pendingLocPubCallbacks = locPubCallbacks;
         locPubCallbacks.clear();
         _last_location_publish_sec = System.uptime();

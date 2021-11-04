@@ -138,7 +138,13 @@ class TrackerLocation
             return *_instance;
         }
 
-        void init();
+        /**
+         * @brief Initialize the TrackerLocation object
+         *
+         * @param gnssRetries GNSS initialization retry count
+         */
+        void init(unsigned int gnssRetries);
+
         void loop();
 
         // register for callback during generation of location publish allowing
@@ -202,7 +208,9 @@ class TrackerLocation
             _newMonotonic(true),
             _firstLockSec(0),
             _gnssStartedSec(0),
-            _lastGnssState(GnssState::OFF) {
+            _lastGnssState(GnssState::OFF),
+            _gnssRetryDefault(0),
+            _gnssCycleCurrent(0) {
 
             _config_state = {
                 .interval_min_seconds = TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC,
@@ -248,8 +256,8 @@ class TrackerLocation
 
         bool isSleepEnabled();
         void enableNetwork();
-        void enableGnss();
-        void disableGnss();
+        int enableGnss();
+        int disableGnss();
         void onSleepPrepare(TrackerSleepContext context);
         void onSleep(TrackerSleepContext context);
         void onSleepCancel(TrackerSleepContext context);
@@ -269,12 +277,29 @@ class TrackerLocation
         int buildEnhLocation(JSONValue& node, LocationPoint& point);
         int enhanced_cb(CloudServiceStatus status, JSONValue* root, const void* context);
 
+        unsigned int setGnssCycle() {
+            return _gnssCycleCurrent = _gnssRetryDefault + 1; // Initial attempt plus retries
+        }
+
+        unsigned int getGnssCycle() const {
+            return _gnssCycleCurrent;
+        }
+
+        unsigned int decGnssCycle() {
+            if (0 != _gnssCycleCurrent) {
+                _gnssCycleCurrent--;
+            }
+            return _gnssCycleCurrent;
+        }
+
         uint32_t _last_location_publish_sec;
         uint32_t _monotonic_publish_sec;
         bool _newMonotonic;
         uint32_t _firstLockSec;
         uint32_t _gnssStartedSec;
         GnssState _lastGnssState;
+        unsigned int _gnssRetryDefault;
+        unsigned int _gnssCycleCurrent;
 
         tracker_location_config_t _config_state, _config_state_shadow, _config_state_loop_safe;
 

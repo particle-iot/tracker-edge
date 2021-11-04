@@ -36,6 +36,31 @@
 #include "temperature.h"
 #include "mcp_can.h"
 
+
+//
+// Default configuration
+//
+#ifndef TRACKER_CONFIG_ENABLE_IO
+// Enable or disable IO/CAN power at initialization, see TrackerConfiguration below
+#define TRACKER_CONFIG_ENABLE_IO              (true)
+#endif
+
+#ifndef TRACKER_CONFIG_ENABLE_IO_SLEEP
+// Enable or disable IO/CAN power shutdown prior to sleep, see TrackerConfiguration below
+#define TRACKER_CONFIG_ENABLE_IO_SLEEP        (false)
+#endif
+
+#ifndef TRACKER_CONFIG_ENABLE_FAST_LOCK
+// Enable or disable faster GNSS lock based on HDOP, see TrackerConfiguration below
+#define TRACKER_CONFIG_ENABLE_FAST_LOCK       (false)
+#endif
+
+#ifndef TRACKER_CONFIG_GNSS_RETRY_COUNT
+// GNSS initialization retry count, see TrackerConfiguration below
+#define TRACKER_CONFIG_GNSS_RETRY_COUNT       (1)
+#endif
+
+
 struct TrackerCloudConfig {
     bool UsbCommandEnable;
 };
@@ -62,9 +87,10 @@ public:
      *
      */
     TrackerConfiguration() :
-        _enableIo(true),
-        _enableIoSleep(false),
-        _enableFastLock(false) {
+        _enableIo(TRACKER_CONFIG_ENABLE_IO),
+        _enableIoSleep(TRACKER_CONFIG_ENABLE_IO_SLEEP),
+        _enableFastLock(TRACKER_CONFIG_ENABLE_FAST_LOCK),
+        _gnssRetryCount(TRACKER_CONFIG_GNSS_RETRY_COUNT) {
 
     }
 
@@ -137,6 +163,26 @@ public:
         return _enableFastLock;
     }
 
+    /**
+     * @brief Set GNSS initialization retry count.
+     *
+     * @param count Number of retry attemps for GNSS initialization
+     * @return TrackerConfiguration&
+     */
+    TrackerConfiguration& gnssRetryCount(unsigned int count) {
+        _gnssRetryCount = count;
+        return *this;
+    }
+
+    /**
+     * @brief Get GNSS initialization retry count.
+     *
+     * @return unsigned int Number of retry attemps for GNSS initialization
+     */
+    unsigned int gnssRetryCount() const {
+        return _gnssRetryCount;
+    }
+
     TrackerConfiguration& operator=(const TrackerConfiguration& rhs) {
         if (this == &rhs) {
             return *this;
@@ -144,6 +190,7 @@ public:
         this->_enableIo = rhs._enableIo;
         this->_enableIoSleep = rhs._enableIoSleep;
         this->_enableFastLock = rhs._enableFastLock;
+        this->_gnssRetryCount = rhs._gnssRetryCount;
 
         return *this;
     }
@@ -151,6 +198,7 @@ private:
     bool _enableIo;
     bool _enableIoSleep;
     bool _enableFastLock;
+    unsigned int _gnssRetryCount;
 };
 
 // this class encapsulates the underlying modules and builds on top of them to

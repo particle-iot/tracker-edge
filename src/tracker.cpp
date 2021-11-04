@@ -558,7 +558,7 @@ int Tracker::init()
 
     motionService.start();
 
-    location.init();
+    location.init(_deviceConfig.gnssRetryCount());
 
     motion.init();
 
