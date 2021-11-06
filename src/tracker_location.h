@@ -204,6 +204,8 @@ class TrackerLocation
             _earlyWake(0),
             _nextEarlyWake(0),
             location_publish_retry_str(nullptr),
+            _lastInterval(0),
+            _publishAttempted(0),
             _monotonic_publish_sec(0),
             _newMonotonic(true),
             _firstLockSec(0),
@@ -293,6 +295,8 @@ class TrackerLocation
         }
 
         uint32_t _last_location_publish_sec;
+        int32_t _lastInterval;
+        std::atomic<size_t> _publishAttempted;
         uint32_t _monotonic_publish_sec;
         bool _newMonotonic;
         uint32_t _firstLockSec;

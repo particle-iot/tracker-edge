@@ -338,6 +338,8 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
         Log.info("location cb publish %lu unexpected status: %d", *(uint32_t *) context, status);
     }
 
+    _publishAttempted++;
+
     if(issue_callbacks)
     {
         issue_location_publish_callbacks(status, rsp_root, req_event);
@@ -507,21 +509,23 @@ EvaluationResults TrackerLocation::evaluatePublish(bool error) {
 // the next time it needs to wake and process inputs, publish, and what not.
 void TrackerLocation::onSleepPrepare(TrackerSleepContext context) {
     // The first thing to figure out is the needed interval, min or max
-    unsigned int wake = _last_location_publish_sec;
-    int32_t interval = 0;
-    if (_pending_triggers.size()) {
-        interval = _config_state.interval_min_seconds;
-        wake += interval;
+    int32_t interval = (_pending_triggers.size()) ?
+        _config_state.interval_min_seconds : _config_state.interval_max_seconds;
+
+    auto published = (0 != _publishAttempted.exchange(0));
+    auto fullWake = _sleep.isFullWakeCycle();
+    if (fullWake && !published) {
+        _last_location_publish_sec = (_lastInterval) ?
+            (_last_location_publish_sec + _lastInterval) : System.uptime();
     }
-    else {
-        interval = _config_state.interval_max_seconds;
-        wake += interval;
-    }
+    unsigned int wake = _last_location_publish_sec + interval;
+
+    _lastInterval = interval;
 
     // Next calculate the early wake offset so that we can wake in the minimum amount of time before
     // the next publish in order to minimize time spent in fully powered operation
     auto t_conn = (uint32_t)_sleep.getConfigConnectingTime();
-    if (_sleep.isFullWakeCycle()) {
+    if (fullWake) {
         uint32_t newEarlyWakeSec = 0;
         uint32_t lastWakeSec = (uint32_t)(context.lastWakeMs + 500) / 1000; // Round ms to s
         if (lastWakeSec >= MiscSleepWakeSec) {
@@ -559,6 +563,8 @@ void TrackerLocation::onSleepPrepare(TrackerSleepContext context) {
     if (wakeRet == TrackerSleepError::TIME_IN_PAST) {
         wake = 0; // Force cancelled sleep
         _sleep.wakeAtSeconds(wake);
+        // Extend to something that will be eventually overrided by the publish evaluation and main loop
+        _sleep.extendExecutionFromNow(interval + _sleep.getConfigExecuteTime());
     }
 
     Log.trace("TrackerLocation: last=%lu, interval=%ld, wake=%u", _last_location_publish_sec, interval, wake);
