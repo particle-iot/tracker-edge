@@ -62,7 +62,7 @@ int LocationService::begin(bool fastLock) {
                             UBLOX_TX_READY_MCU_PIN,
                             UBLOX_TX_READY_GPS_PIN);
         if (!gps_) {
-            LOG(ERROR, "ubloxGPS instantiation failed");
+            Log.error("ubloxGPS instantiation failed");
             ret = SYSTEM_ERROR_INTERNAL;
             break;
         }

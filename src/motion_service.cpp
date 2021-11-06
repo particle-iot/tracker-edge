@@ -94,7 +94,7 @@ int MotionService::start(size_t eventDepth) {
     // Retrieve (if first time) instance of the BMI160 IMU device
     ret = BMI160.begin(BMI160_SPI_INTERFACE, BMI160_SPI_CS_PIN, BMI160_INT_PIN);
     if (ret != SYSTEM_ERROR_NONE) {
-        LOG(ERROR, "BMI160.begin() failed");
+        Log.error("BMI160.begin() failed");
         return ret;
     }
 
@@ -107,14 +107,14 @@ int MotionService::start(size_t eventDepth) {
     eventDepth_ = eventDepth;
     if (!motionEventQueue_ && os_queue_create(&motionEventQueue_, sizeof(MotionEvent), eventDepth, nullptr)) {
         motionEventQueue_ = nullptr;
-        LOG(ERROR, "os_queue_create() failed");
+        Log.error("os_queue_create() failed");
         return SYSTEM_ERROR_INTERNAL;
     }
 
     // Start the main MotionService thread
     ret = os_thread_create(&thread_, "MOTSERV", OS_THREAD_PRIORITY_DEFAULT, MotionService::thread, this, OS_THREAD_STACK_SIZE_DEFAULT);
     if (ret) {
-        LOG(ERROR, "os_thread_create() failed");
+        Log.error("os_thread_create() failed");
         return ret;
     }
 

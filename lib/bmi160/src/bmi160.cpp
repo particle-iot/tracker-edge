@@ -121,7 +121,7 @@ int Bmi160::begin(const TwoWire* interface, uint8_t address, pin_t interruptPin,
 
     if (os_queue_create(&motionSyncQueue_, sizeof(Bmi160EventType), eventDepth, nullptr)) {
         motionSyncQueue_ = nullptr;
-        LOG(ERROR, "os_queue_create() failed");
+        Log.error("os_queue_create() failed");
         return SYSTEM_ERROR_INTERNAL;
     }
 
@@ -132,7 +132,7 @@ int Bmi160::begin(const TwoWire* interface, uint8_t address, pin_t interruptPin,
     wire_->begin();
     wire_->beginTransmission(address);
     if (wire_->endTransmission() != 0) {
-        LOG(ERROR, "address invalid or device failed");
+        Log.error("address invalid or device failed");
         return SYSTEM_ERROR_IO;
     }
 
@@ -152,7 +152,7 @@ int Bmi160::begin(const SPIClass& interface, pin_t selectPin, pin_t interruptPin
 
     if (os_queue_create(&motionSyncQueue_, sizeof(Bmi160EventType), eventDepth, nullptr)) {
         motionSyncQueue_ = nullptr;
-        LOG(ERROR, "os_queue_create() failed");
+        Log.error("os_queue_create() failed");
         return SYSTEM_ERROR_INTERNAL;
     }
 
