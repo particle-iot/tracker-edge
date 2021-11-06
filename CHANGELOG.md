@@ -1,3 +1,26 @@
+## v16
+
+### COMPATIBILTY
+
+Must be built using device OS v3.0.0 or greater.
+
+### FEATURES
+
+- Additional setting and implementation for GNSS initialization retries if failures are detected.
+
+### ENHANCEMENTS
+
+- The ublox GPS library has been updated to provide performance counters.
+
+### BUGFIXES
+
+- Fix to calculating sleep and execution times when the device is in areas of low connectivity.
+
+### OTHER CHANGES
+
+- Switched several logging calls from the LOG() macro to the functional Log() method.
+
+
 ## v15
 
 ### COMPATIBILTY
