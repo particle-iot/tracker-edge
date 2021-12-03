@@ -138,6 +138,71 @@ void TrackerLocation::init(unsigned int gnssRetries)
 
     ConfigService::instance().registerModule(location_desc);
 
+    static ConfigObject geofence_desc("geofence", {
+        ConfigInt("interval", &_geofenceConfig.interval, 0, 86400l),
+        ConfigObject("zone1", {
+            ConfigBool("enable", &_geofence.GetZoneInfo(0).enable),
+            ConfigFloat("lat", &_geofence.GetZoneInfo(0).center_lat),
+            ConfigFloat("lon", &_geofence.GetZoneInfo(0).center_lon),
+            ConfigFloat("radius", &_geofence.GetZoneInfo(0).radius),
+            ConfigBool("outside", &_geofence.GetZoneInfo(0).outside_event),
+            ConfigBool("inside", &_geofence.GetZoneInfo(0).inside_event),
+            ConfigBool("enter", &_geofence.GetZoneInfo(0).enter_event),
+            ConfigBool("exit", &_geofence.GetZoneInfo(0).exit_event),
+            ConfigInt("verif", &_geofence.GetZoneInfo(0).verification_time_sec),
+            ConfigStringEnum("shape_type", {
+                {"circular", (int32_t) GeofenceShapeType::CIRCULAR},
+                {"polygonal", (int32_t) GeofenceShapeType::POLYGONAL}
+            }, &_geofence.GetZoneInfo(0).shape_type)
+        }),
+        ConfigObject("zone2", {
+            ConfigBool("enable", &_geofence.GetZoneInfo(1).enable),
+            ConfigFloat("lat", &_geofence.GetZoneInfo(1).center_lat),
+            ConfigFloat("lon", &_geofence.GetZoneInfo(1).center_lon),
+            ConfigFloat("radius", &_geofence.GetZoneInfo(1).radius),
+            ConfigBool("outside", &_geofence.GetZoneInfo(1).outside_event),
+            ConfigBool("inside", &_geofence.GetZoneInfo(1).inside_event),
+            ConfigBool("enter", &_geofence.GetZoneInfo(1).enter_event),
+            ConfigBool("exit", &_geofence.GetZoneInfo(1).exit_event),
+            ConfigInt("verif", &_geofence.GetZoneInfo(1).verification_time_sec),
+            ConfigStringEnum("shape_type", {
+                {"circular", (int32_t) GeofenceShapeType::CIRCULAR},
+                {"polygonal", (int32_t) GeofenceShapeType::POLYGONAL}
+            }, &_geofence.GetZoneInfo(1).shape_type)
+        }),
+        ConfigObject("zone3", {
+            ConfigBool("enable", &_geofence.GetZoneInfo(2).enable),
+            ConfigFloat("lat", &_geofence.GetZoneInfo(2).center_lat),
+            ConfigFloat("lon", &_geofence.GetZoneInfo(2).center_lon),
+            ConfigFloat("radius", &_geofence.GetZoneInfo(2).radius),
+            ConfigBool("outside", &_geofence.GetZoneInfo(2).outside_event),
+            ConfigBool("inside", &_geofence.GetZoneInfo(2).inside_event),
+            ConfigBool("enter", &_geofence.GetZoneInfo(2).enter_event),
+            ConfigBool("exit", &_geofence.GetZoneInfo(2).exit_event),
+            ConfigInt("verif", &_geofence.GetZoneInfo(2).verification_time_sec),
+            ConfigStringEnum("shape_type", {
+                {"circular", (int32_t) GeofenceShapeType::CIRCULAR},
+                {"polygonal", (int32_t) GeofenceShapeType::POLYGONAL}
+            }, &_geofence.GetZoneInfo(2).shape_type)
+        }),
+        ConfigObject("zone4", {
+            ConfigBool("enable", &_geofence.GetZoneInfo(3).enable),
+            ConfigFloat("lat", &_geofence.GetZoneInfo(3).center_lat),
+            ConfigFloat("lon", &_geofence.GetZoneInfo(3).center_lon),
+            ConfigFloat("radius", &_geofence.GetZoneInfo(3).radius),
+            ConfigBool("outside", &_geofence.GetZoneInfo(3).outside_event),
+            ConfigBool("inside", &_geofence.GetZoneInfo(3).inside_event),
+            ConfigBool("enter", &_geofence.GetZoneInfo(3).enter_event),
+            ConfigBool("exit", &_geofence.GetZoneInfo(3).exit_event),
+            ConfigInt("verif", &_geofence.GetZoneInfo(3).verification_time_sec),
+            ConfigStringEnum("shape_type", {
+                {"circular", (int32_t) GeofenceShapeType::CIRCULAR},
+                {"polygonal", (int32_t) GeofenceShapeType::POLYGONAL}
+            }, &_geofence.GetZoneInfo(3).shape_type)
+        }),
+    });
+    ConfigService::instance().registerModule(geofence_desc);
+
     CloudService::instance().regCommandCallback("get_loc", &TrackerLocation::get_loc_cb, this);
 
     _last_location_publish_sec = System.uptime() - _config_state.interval_min_seconds;
@@ -147,6 +212,9 @@ void TrackerLocation::init(unsigned int gnssRetries)
     _sleep.registerSleepCancel([this](TrackerSleepContext context){ this->onSleepCancel(context); });
     _sleep.registerWake([this](TrackerSleepContext context){ this->onWake(context); });
     _sleep.registerStateChange([this](TrackerSleepContext context){ this->onSleepState(context); });
+
+    _geofence.RegisterGeofenceCallback([this](CallbackContext& context){ this->onGeofenceCallback(context); });
+    _geofence.init();
 
     CloudService::instance().regCommandCallback("loc-enhanced", &TrackerLocation::enhanced_cb, this);
 
@@ -162,13 +230,13 @@ int TrackerLocation::buildEnhLocation(JSONValue& node, LocationPoint& point) {
             if (!locChild.value().isNumber()) {
                 return -EINVAL;
             }
-            point.latitude = (float)locChild.value().toDouble();
+            point.latitude = locChild.value().toDouble();
         }
         else if (locChild.name() == "lon") {
             if (!locChild.value().isNumber()) {
                 return -EINVAL;
             }
-            point.longitude = (float)locChild.value().toDouble();
+            point.longitude = locChild.value().toDouble();
         }
         else if (locChild.name() == "h_acc") {
             if (!locChild.value().isNumber()) {
@@ -450,7 +518,7 @@ EvaluationResults TrackerLocation::evaluatePublish(bool error) {
     // This may be pre-emptively published due to connect and execute times if sleep is enabled.
     // If sleep is disabled then timeout after some time.
     if (_first_publish && !_pending_first_publish) {
-        Log.trace("%s first", __FUNCTION__);
+        //Log.trace("%s first", __FUNCTION__);
         return EvaluationResults {PublishReason::TRIGGERS, true, (now - _gnssStartedSec) < (uint32_t)_sleep.getConfigConnectingTime()};
     }
 
@@ -558,6 +626,14 @@ void TrackerLocation::onSleepPrepare(TrackerSleepContext context) {
     if (wake > _nextEarlyWake)
         wake -= _nextEarlyWake;
 
+    if (_geofenceConfig.interval && _config_state_loop_safe.gnss && _geofence.AnyGeofenceEnabled()) {
+        unsigned int geoWake = System.uptime() + (unsigned int)_geofenceConfig.interval;
+        if (geoWake < wake) {
+            wake = geoWake;
+        }
+        _pendingGeofence = true;
+    }
+
     TrackerSleepError wakeRet = _sleep.wakeAtSeconds(wake);
 
     if (wakeRet == TrackerSleepError::TIME_IN_PAST) {
@@ -594,6 +670,10 @@ void TrackerLocation::onWake(TrackerSleepContext context) {
         // GNSS power state handled elsewhere
         Log.trace("%s needs to start the network", __FUNCTION__);
     }
+    else if (_geofenceConfig.interval && _pendingGeofence) {
+        Log.trace("%s needs to evaluate geofences", __FUNCTION__);
+        _sleep.extendExecution(_sleep.getConfigConnectingTime());
+    }
     else {
         // Put in our vote to shutdown early
         _sleep.extendExecutionFromNow(EarlySleepSec, true);
@@ -620,6 +700,39 @@ void TrackerLocation::onSleepState(TrackerSleepContext context) {
             break;
         }
     }
+}
+
+void TrackerLocation::onGeofenceCallback(CallbackContext& context) {
+    // Associate the zone with static zone strings
+    char* zoneStr = nullptr;
+    constexpr const char* outsideStr[] = {"outside1", "outside2", "outside3", "outside4"};
+    constexpr const char* insideStr[] = {"inside1", "inside2", "inside3", "inside4"};
+    constexpr const char* enterStr[] = {"enter1", "enter2", "enter3", "enter4"};
+    constexpr const char* exitStr[] = {"exit1", "exit2", "exit3", "exit4"};
+
+    switch(context.event_type) {
+        case GeofenceEventType::OUTSIDE:
+            zoneStr = (char*)outsideStr[context.index];
+            //Log.info("Outside CB Triggered in %s", zoneStr);
+        break;
+        case GeofenceEventType::INSIDE:
+            zoneStr = (char*)insideStr[context.index];
+            //Log.info("Inside CB Triggered in %s", zoneStr);
+        break;
+        case GeofenceEventType::ENTER:
+            zoneStr = (char*)enterStr[context.index];
+            //Log.info("Enter CB Triggered in %s", zoneStr);
+        break;
+        case GeofenceEventType::EXIT:
+            zoneStr = (char*)exitStr[context.index];
+            //Log.info("Exit CB Triggered in %s", zoneStr);
+        break;
+        default:
+            Log.error("Unsupported event type %d", (int)context.event_type);
+            return;
+    }
+
+    triggerLocPub(Trigger::NORMAL, zoneStr);
 }
 
 int TrackerLocation::parseServeCell(const char* in, CellularServing& out) {
@@ -961,7 +1074,9 @@ void TrackerLocation::loop() {
         setGnssCycle();
     }
 
-    if (_config_state_loop_safe.gnss && _sleep.isFullWakeCycle() && (0 != getGnssCycle())) {
+    if ((_geofenceConfig.interval && _pendingGeofence) ||
+        (_config_state_loop_safe.gnss && _sleep.isFullWakeCycle() && (0 != getGnssCycle()))) {
+        _pendingGeofence = false;
         // This is safe to call repeatedly
         enableGnss();
     } else  if (!_config_state_loop_safe.gnss){
@@ -982,6 +1097,16 @@ void TrackerLocation::loop() {
     // Override the location status if still retrying
     if ((GnssState::ERROR == locationStatus) && (0 != getGnssCycle())) {
         locationStatus = GnssState::ON_UNLOCKED;
+    }
+    // Only evaluate geofence if GNSS lock is stable
+    if (_config_state_loop_safe.gnss && _sleep.isFullWakeCycle() && _geofence.AnyGeofenceEnabled() && LocationService::instance().isLockStable()) {
+        // Update geofence data
+        PointData geofence_point;
+        geofence_point.lat = cur_loc.latitude;
+        geofence_point.lon = cur_loc.longitude;
+
+        _geofence.UpdateGeofencePoint(geofence_point);
+        _geofence.loop();
     }
 
     // Perform interval evaluation
@@ -1034,7 +1159,7 @@ void TrackerLocation::loop() {
                         publishNow = true;
                         break;
                     }
-                    Log.trace("waiting for stable GNSS lock for max interval");
+                    //Log.trace("waiting for stable GNSS lock for max interval");
                     break;
                 }
             }

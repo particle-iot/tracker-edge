@@ -141,8 +141,8 @@ int LocationService::getLocation(LocationPoint& point) {
         point.epochTime = (time_t)gps_->getUTCTime();
         point.timeScale = LocationTimescale::TIMESCALE_UTC;
         if (point.locked) {
-            point.latitude = (float)gps_->getLatitude();
-            point.longitude = (float)gps_->getLongitude();
+            point.latitude = gps_->getLatitude();
+            point.longitude = gps_->getLongitude();
             point.altitude = gps_->getAltitude();
             point.speed = gps_->getSpeed(GPS_SPEED_UNIT_MPS);
             point.heading = gps_->getHeading();

@@ -21,6 +21,7 @@
 #include "location_service.h"
 #include "motion_service.h"
 #include "tracker_sleep.h"
+#include "Geofence.h"
 
 #define TRACKER_LOCATION_INTERVAL_MIN_DEFAULT_SEC (900)
 #define TRACKER_LOCATION_INTERVAL_MAX_DEFAULT_SEC (3600)
@@ -39,6 +40,7 @@
 constexpr int TrackerLocationMaxWpsCollect = 20;
 constexpr int TrackerLocationMaxWpsSend = 5;
 constexpr int TrackerLocationMaxTowerSend = 3;
+constexpr int NUM_OF_GEOFENCE_ZONES = 4;
 
 enum class RadioAccessTechnology {
     NONE = -1,
@@ -121,6 +123,10 @@ struct EvaluationResults {
     bool lockWait;
 };
 
+struct TrackerGeofenceConfig {
+    int32_t interval; // seconds
+};
+
 class TrackerLocation
 {
     public:
@@ -193,9 +199,14 @@ class TrackerLocation
 
         int addWap(WiFiAccessPoint* wap);
 
+        Geofence& getGeoFence() {
+            return _geofence;
+        }
+
     private:
         TrackerLocation() :
             _sleep(TrackerSleep::instance()),
+            _geofence(NUM_OF_GEOFENCE_ZONES),
             _loopSampleTick(0),
             _pending_immediate(false),
             _first_publish(true),
@@ -203,6 +214,7 @@ class TrackerLocation
             _pendingShutdown(false),
             _earlyWake(0),
             _nextEarlyWake(0),
+            _pendingGeofence(false),
             location_publish_retry_str(nullptr),
             _lastInterval(0),
             _publishAttempted(0),
@@ -231,6 +243,7 @@ class TrackerLocation
         }
         static TrackerLocation *_instance;
         TrackerSleep& _sleep;
+        Geofence _geofence;
 
         RecursiveMutex mutex;
 
@@ -242,6 +255,8 @@ class TrackerLocation
         bool _pendingShutdown;
         unsigned int _earlyWake;
         unsigned int _nextEarlyWake;
+        TrackerGeofenceConfig _geofenceConfig {};
+        bool _pendingGeofence;
 
         char *location_publish_retry_str;
 
@@ -265,6 +280,7 @@ class TrackerLocation
         void onSleepCancel(TrackerSleepContext context);
         void onWake(TrackerSleepContext context);
         void onSleepState(TrackerSleepContext context);
+        void onGeofenceCallback(CallbackContext& context);
         EvaluationResults evaluatePublish(bool error);
         void buildPublish(LocationPoint& cur_loc, bool error = false);
         GnssState loopLocation(LocationPoint& cur_loc);

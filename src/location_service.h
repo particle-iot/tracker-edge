@@ -67,8 +67,8 @@ struct LocationPoint {
     bool stable;                    /**< Indication if GNNS lock is stable (if applicable) */
     time_t epochTime;               /**< Epoch time from device sources */
     LocationTimescale timeScale;    /**< Epoch timescale */
-    float latitude;                 /**< Point latitude in degrees */
-    float longitude;                /**< Point longitude in degrees */
+    double latitude;                /**< Point latitude in degrees */
+    double longitude;               /**< Point longitude in degrees */
     float altitude;                 /**< Point altitude in meters */
     float speed;                    /**< Point speed in meters per second */
     float heading;                  /**< Point heading in degrees */
@@ -84,8 +84,8 @@ struct LocationPoint {
  */
 struct PointThreshold {
     float radius;
-    float latitude;
-    float longitude;
+    double latitude;
+    double longitude;
 };
 
 struct LocationStatus {
@@ -235,6 +235,26 @@ public:
      * @retval SYSTEM_ERROR_INVALID_STATE
      */
     int getStatus(LocationStatus& status);
+
+    /**
+     * @brief Is GNSS lock stable
+     *
+     * @retval TRUE if locked
+     * @retval FALSE if not locked
+     */
+    bool isLockStable() {
+        return gps_->isLockStable();
+    }
+
+    /**
+     * @brief Indicate whether the GNSS module is active and sending NMEA/UBX data
+     *
+     * @return true Is active
+     * @return false Is not active
+     */
+    bool isActive() {
+        return gps_->is_active();
+    };
 
 private:
 
