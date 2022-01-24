@@ -38,6 +38,7 @@ constexpr unsigned int TrackerChargingSleepEvalTime = 1; // seconds to sample th
 constexpr uint16_t TrackerChargeCurrentHigh = 1024; // milliamps
 constexpr uint16_t TrackerChargeCurrentLow = 512; // milliamps
 constexpr uint16_t TrackerInputCurrent = 1500; // milliamps
+constexpr unsigned int TrackerFailedOtaKeepAwake = 60; // seconds to stay awake after failed OTA
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -484,6 +485,36 @@ void Tracker::completeSetupDone()
     }
 }
 
+void Tracker::otaHandler(system_event_t event, int param) {
+    switch ((unsigned int)param) {
+        case SystemEventsParam::firmware_update_complete: {
+            // There will be an imminent system reset so disable the watchdog
+            enableWatchdog(false);
+        }
+        break;
+
+        case SystemEventsParam::firmware_update_begin: {
+            if (!sleep.isSleepDisabled()) {
+                // Don't allow the device to go asleep if an OTA has begun
+                sleep.pauseSleep();
+            }
+        }
+        break;
+
+        case SystemEventsParam::firmware_update_failed: {
+            if (!sleep.isSleepDisabled()) {
+                // Allow the device to go asleep after a chance for the cloud to restart a failed OTA
+                sleep.extendExecutionFromNow(TrackerFailedOtaKeepAwake);
+                sleep.resumeSleep();
+            }
+        }
+        break;
+
+        default:
+            break;
+    }
+}
+
 void Tracker::startup()
 {
     completeSetupDone();
@@ -497,6 +528,9 @@ int Tracker::init()
     int ret = 0;
 
     _lastLoopSec = System.uptime();
+
+    // Disable OTA updates until after the system handler has been registered
+    System.disableUpdates();
 
 #ifndef TRACKER_MODEL_NUMBER
     ret = hal_get_device_hw_model(&_model, &_variant, nullptr);
@@ -576,6 +610,19 @@ int Tracker::init()
     rtc.begin();
     enableWatchdog(true);
 
+    // Associate handler to OTAs and pending resets to disable the watchdog
+    System.on(reset_pending,
+        [this](system_event_t event, int param){
+            // Stop everything
+            stop();
+            end();
+        }
+    );
+    System.on(firmware_update, [this](system_event_t event, int param){ otaHandler(event, param); });
+
+    // Allow OTAs now that the firmware update handlers are registered
+    System.enableUpdates();
+
     location.regLocGenCallback(loc_gen_cb);
 
     return SYSTEM_ERROR_NONE;
@@ -638,6 +685,15 @@ int Tracker::stop() {
 int Tracker::end() {
     enableIoCanPower(false);
     GnssLedEnable(false);
+    enableWatchdog(false);
+
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::reset() {
+    stop();
+    end();
+    System.reset();
 
     return SYSTEM_ERROR_NONE;
 }

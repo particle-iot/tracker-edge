@@ -257,6 +257,13 @@ class Tracker {
         int end();
 
         /**
+         * @brief Prepare tracker for reset and issue
+         *
+         * @return SYSTEM_ERROR_NONE
+         */
+        int reset();
+
+        /**
          * @brief Get the tracker hardware model number
          *
          * @return uint32_t Model number
@@ -427,4 +434,12 @@ class Tracker {
         void initBatteryMonitor();
         bool getChargeEnabled();
         void evaluateBatteryCharge();
+
+        /**
+         * @brief Handle OTA events from System.on() interface
+         *
+         * @param event Event class
+         * @param data Particular event
+         */
+        void otaHandler(system_event_t event, int data);
 };

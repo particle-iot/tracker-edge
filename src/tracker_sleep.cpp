@@ -32,8 +32,10 @@ int TrackerSleep::enterReset() {
   auto deferredReset = new Timer(TrackerSleepResetTimerDelay, [this]() {
     LocationService::instance().stop();
     delay(1000);
-    System.reset();
+    Tracker::instance().reset();
   }, true);
+  // Extend execution to wait for the eventual reset
+  extendExecution(TrackerSleepResetTimerDelay / S2M(1) * 2);
   deferredReset->start();
 
   return SYSTEM_ERROR_NONE;
