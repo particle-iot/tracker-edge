@@ -39,6 +39,7 @@ constexpr uint16_t TrackerChargeCurrentHigh = 1024; // milliamps
 constexpr uint16_t TrackerChargeCurrentLow = 512; // milliamps
 constexpr uint16_t TrackerInputCurrent = 1500; // milliamps
 constexpr unsigned int TrackerFailedOtaKeepAwake = 60; // seconds to stay awake after failed OTA
+constexpr system_tick_t TrackerWatchdogExpireTime = 60 * 1000; // milliseconds to expire the WDT
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -67,7 +68,6 @@ Tracker::Tracker() :
     sleep(TrackerSleep::instance()),
     locationService(LocationService::instance()),
     motionService(MotionService::instance()),
-    rtc(AM1805_PIN_INVALID, RTC_AM1805_I2C_INSTANCE, RTC_AM1805_I2C_ADDR),
     location(TrackerLocation::instance()),
     motion(TrackerMotion::instance()),
     shipping(TrackerShipping::instance()),
@@ -222,11 +222,11 @@ void Tracker::enableWatchdog(bool enable) {
 #ifndef RTC_WDT_DISABLE
     if (enable) {
         // watchdog at 1 minute
-        rtc.configure_wdt(true, 15, AM1805_WDT_REGISTER_WRB_QUARTER_HZ);
-        rtc.reset_wdt();
+        hal_exrtc_enable_watchdog(TrackerWatchdogExpireTime, nullptr);
+        hal_exrtc_feed_watchdog(nullptr);
     }
     else {
-        rtc.disable_wdt();
+        hal_exrtc_disable_watchdog(nullptr);
     }
 #else
     (void)enable;
@@ -607,7 +607,6 @@ int Tracker::init()
 
     rgb.init();
 
-    rtc.begin();
     enableWatchdog(true);
 
     // Associate handler to OTAs and pending resets to disable the watchdog
@@ -638,7 +637,7 @@ void Tracker::loop()
         _lastLoopSec = cur_sec;
 
 #ifndef RTC_WDT_DISABLE
-        rtc.reset_wdt();
+        hal_exrtc_feed_watchdog(nullptr);
 #endif
     }
 

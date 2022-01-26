@@ -18,6 +18,7 @@
 
 #include "dct.h"
 #include "deviceid_hal.h"
+#include "exrtc_hal.h"
 
 #include "tracker_config.h"
 
@@ -25,7 +26,6 @@
 #include "config_service.h"
 #include "location_service.h"
 #include "motion_service.h"
-#include "AM1805.h"
 
 #include "tracker_sleep.h"
 #include "tracker_location.h"
@@ -371,9 +371,6 @@ class Tracker {
         TrackerSleep &sleep;
         LocationService &locationService;
         MotionService &motionService;
-
-        AM1805 rtc;
-
         TrackerLocation &location;
         TrackerMotion &motion;
         TrackerShipping &shipping;
