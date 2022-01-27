@@ -714,19 +714,28 @@ void TrackerLocation::onGeofenceCallback(CallbackContext& context) {
         case GeofenceEventType::OUTSIDE:
             zoneStr = (char*)outsideStr[context.index];
             //Log.info("Outside CB Triggered in %s", zoneStr);
-        break;
+            break;
+
         case GeofenceEventType::INSIDE:
             zoneStr = (char*)insideStr[context.index];
             //Log.info("Inside CB Triggered in %s", zoneStr);
-        break;
+            break;
+
         case GeofenceEventType::ENTER:
             zoneStr = (char*)enterStr[context.index];
             //Log.info("Enter CB Triggered in %s", zoneStr);
-        break;
+            break;
+
         case GeofenceEventType::EXIT:
             zoneStr = (char*)exitStr[context.index];
             //Log.info("Exit CB Triggered in %s", zoneStr);
-        break;
+            break;
+
+        case GeofenceEventType::POOR_LOCATION:
+            // Do nothing
+            //Log.info("Poor location CB triggered in zone %d", context.index);
+            return;
+
         default:
             Log.error("Unsupported event type %d", (int)context.event_type);
             return;
