@@ -1,3 +1,26 @@
+## v17
+
+### COMPATIBILTY
+
+Must be built using device OS v3.2.0 or greater.
+
+### FEATURES
+
+- Geofence feature with settings for 4 circular zones.
+
+### ENHANCEMENTS
+
+- Replaced application AM1805 RTC driver with new device OS watchdog calls.
+
+### BUGFIXES
+
+- Disable the hardware watchdog whenever performing firmware updates over OTA.
+
+### OTHER CHANGES
+
+- [TRACKER ONE] Changed the low battery evaluation interval to catch low state-of-charge sooner.
+
+
 ## v16
 
 ### COMPATIBILTY
