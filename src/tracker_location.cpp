@@ -967,10 +967,10 @@ GnssState TrackerLocation::loopLocation(LocationPoint& cur_loc) {
             break;
         }
 
-        float radius;
+        float radius {0.0};
         LocationService::instance().getRadiusThreshold(radius);
         if (radius) {
-            bool outside;
+            bool outside {false};
             LocationService::instance().isOutsideRadius(outside, cur_loc);
             if (outside) {
                 triggerLocPub(Trigger::NORMAL,"radius");
