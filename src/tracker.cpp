@@ -19,6 +19,7 @@
 #include "tracker.h"
 #include "tracker_cellular.h"
 #include "mcp_can.h"
+#include "LocationPublish.h"
 
 // Defines and constants
 constexpr int CanSleepRetries = 10; // Based on a series of 10ms delays
@@ -634,6 +635,8 @@ int Tracker::init()
     rgb.init();
 
     enableWatchdog(true);
+
+    LocationPublish::instance().init();
 
     // Associate handler to OTAs and pending resets to disable the watchdog
     System.on(reset_pending,

@@ -24,6 +24,7 @@
 
 #include "config_service.h"
 #include "location_service.h"
+#include "LocationPublish.h"
 
 TrackerLocation *TrackerLocation::_instance = nullptr;
 
@@ -322,6 +323,14 @@ int TrackerLocation::regLocPubCallback(
     return 0;
 }
 
+int TrackerLocation::regPendLocPubCallback(
+    cloud_service_send_cb_t cb,
+    const void *context)
+{
+    pendingLocPubCallbacks.append(std::bind(cb, _1, _2, _3, context));
+    return 0;
+}
+
 int TrackerLocation::regEnhancedLocCallback(
     std::function<void(const LocationPoint &, const void *)> cb,
     const void *context)
@@ -368,8 +377,6 @@ void TrackerLocation::issue_location_publish_callbacks(CloudServiceStatus status
 
 int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *rsp_root, const char *req_event, const void *context)
 {
-    bool issue_callbacks = true;
-
     if(status == CloudServiceStatus::SUCCESS)
     {
         // this could either be on the Particle Cloud ack (default) OR the
@@ -380,22 +387,6 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
     }
     else if(status == CloudServiceStatus::FAILURE)
     {
-        // right now FAILURE only comes out of a Particle Cloud issue
-        // once Particle Cloud passes if waiting on end-to-end it will
-        // only ever timeout
-
-        // save on failure for retry
-        if(req_event && !location_publish_retry_str)
-        {
-            size_t len = strlen(req_event) + 1;
-            location_publish_retry_str = (char *) malloc(len);
-            if(location_publish_retry_str)
-            {
-                memcpy(location_publish_retry_str, req_event, len);
-                // we've saved for retry, defer callbacks until retry completes
-                issue_callbacks = false;
-            }
-        }
         Log.info("location cb publish %lu failure", *(uint32_t *) context);
     }
     else if(status == CloudServiceStatus::TIMEOUT)
@@ -409,10 +400,7 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
 
     _publishAttempted++;
 
-    if(issue_callbacks)
-    {
-        issue_location_publish_callbacks(status, rsp_root, req_event);
-    }
+    issue_location_publish_callbacks(status, rsp_root, req_event);
 
     return 0;
 }
@@ -429,58 +417,16 @@ void TrackerLocation::location_publish()
     CloudServicePublishFlags cloud_flags =
         (_config_state.process_ack) ? CloudServicePublishFlags::FULL_ACK : CloudServicePublishFlags::NONE;
 
-    if(location_publish_retry_str)
-    {
-        // publish a retry loc
-        rval = cloud_service.send(location_publish_retry_str,
-            WITH_ACK,
-            cloud_flags,
-            &TrackerLocation::location_publish_cb, this,
-            CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
-    }
-    else
-    {
-        // publish a new loc (contained in cloud_service buffer)
-        rval = cloud_service.send(WITH_ACK,
-            cloud_flags,
-            &TrackerLocation::location_publish_cb, this,
-            CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
-    }
+    // publish a new loc (contained in cloud_service buffer)
+    rval = cloud_service.send(WITH_ACK,
+        cloud_flags,
+        &TrackerLocation::location_publish_cb, this,
+        CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
 
-    if(rval == -EBUSY)
+    //if error issue the user defined callbacks
+    if(rval)
     {
-        // this implies a transient failure that should recover very
-        // quickly (normally another publish in progress blocking lower
-        // in the system)
-        // save off the generated publish to retry as it has already
-        // consumed pending events if applicable
-        if(!location_publish_retry_str)
-        {
-            size_t len = strlen(cloud_service.writer().buffer()) + 1;
-            location_publish_retry_str = (char *) malloc(len);
-            if(location_publish_retry_str)
-            {
-                memcpy(location_publish_retry_str, cloud_service.writer().buffer(), len);
-            }
-            else
-            {
-                // generated successfuly but unable to save off a copy to retry
-                issue_location_publish_callbacks(CloudServiceStatus::FAILURE, NULL, cloud_service.writer().buffer());
-            }
-        }
-    }
-    else
-    {
-        if(rval)
-        {
-            issue_location_publish_callbacks(CloudServiceStatus::FAILURE, NULL, location_publish_retry_str);
-        }
-        if(location_publish_retry_str)
-        {
-            // on success or fatal failure free it
-            free(location_publish_retry_str);
-            location_publish_retry_str = nullptr;
-        }
+        issue_location_publish_callbacks(CloudServiceStatus::FAILURE, NULL, cloud_service.writer().buffer());
     }
     cloud_service.unlock();
 }
@@ -982,6 +928,8 @@ void TrackerLocation::loop() {
         return;
     }
 
+    LocationPublish::instance().tick();
+
     bool firstLoop = (_loopSampleTick == 0);
     _loopSampleTick = millis();
 
@@ -1001,12 +949,6 @@ void TrackerLocation::loop() {
     } else  if (!_config_state_loop_safe.gnss){
         // This is safe to call repeatedly
         disableGnss();
-    }
-
-    // First take care of any retry attempts of last loc
-    if (location_publish_retry_str && Particle.connected()) {
-        Log.info("retry failed publish");
-        location_publish();
     }
 
     // Gather current location information and status
@@ -1131,17 +1073,9 @@ void TrackerLocation::loop() {
     //
 
     // then of any new publish
-    if(publishNow && Particle.connected())
+    if(publishNow && (Particle.connected() ||
+            LocationPublish::instance().isStoreEnabled()))
     {
-        if(location_publish_retry_str)
-        {
-            Log.info("freeing unsuccessful retry");
-            // retried attempt not completed in time for new publish
-            // drop and issue callbacks
-            issue_location_publish_callbacks(CloudServiceStatus::TIMEOUT, NULL, location_publish_retry_str);
-            free(location_publish_retry_str);
-            location_publish_retry_str = nullptr;
-        }
         Log.info("publishing now...");
         buildPublish(cur_loc, (0 == getGnssCycle()));
         pendingLocPubCallbacks = locPubCallbacks;

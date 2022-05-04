@@ -16,3 +16,9 @@
 [submodule "lib/memfault"]
 	path = lib/memfault
 	url = https://github.com/memfault/particle-firmware-library.git
+[submodule "lib/background-publish"]
+	path = lib/background-publish
+	url = https://github.com/particle-iot/background-publish.git
+[submodule "lib/disk-queue"]
+	path = lib/disk-queue
+	url = https://github.com/particle-iot/disk-queue.git
