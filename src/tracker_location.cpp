@@ -20,6 +20,7 @@
 #include "Particle.h"
 #include "tracker_config.h"
 #include "tracker_location.h"
+#include "tracker_cellular.h"
 
 #include "config_service.h"
 #include "location_service.h"
@@ -744,109 +745,18 @@ void TrackerLocation::onGeofenceCallback(CallbackContext& context) {
     triggerLocPub(Trigger::NORMAL, zoneStr);
 }
 
-int TrackerLocation::parseServeCell(const char* in, CellularServing& out) {
-    CellularServing ret;
-    char state[16] = {};
-    char rat[16] = {};
-
-    out = {};
-    auto nitems = sscanf(in, " +QENG: \"servingcell\",\"%15[^\"]\",\"%15[^\"]\",\"%*15[^\"]\","
-            "%u,%u,%lX,"
-            "%*15[^,],%*15[^,],%*15[^,],%*15[^,],%*15[^,],%X,%d",
-            state, rat,
-            &ret.mcc, &ret.mnc, &ret.cellId, &ret.tac, &ret.signalPower);
-
-    if (nitems < 7) {
-        return SYSTEM_ERROR_NOT_ENOUGH_DATA;
-    }
-
-    if (!strncmp(rat, "CAT-M", 5)) {
-        out.rat = RadioAccessTechnology::LTE_CAT_M1;
-    }
-    else if (!strncmp(rat, "LTE", 3)) {
-        out.rat = RadioAccessTechnology::LTE;
-    }
-    else if (!strncmp(rat, "CAT-NB", 6)) {
-        out.rat = RadioAccessTechnology::LTE_NB_IOT;
-    }
-    else {
-        return SYSTEM_ERROR_NOT_SUPPORTED;
-    }
-
-    out.mcc = ret.mcc;
-    out.mnc = ret.mnc;
-    out.cellId = ret.cellId;
-    out.tac = ret.tac;
-    out.signalPower = ret.signalPower;
-
-    return SYSTEM_ERROR_NONE;
-}
-
-int TrackerLocation::serving_cb(int type, const char* buf, int len, TrackerLocation* context) {
-    if (type == TYPE_OK) {
-        return RESP_OK;
-    }
-
-    (void)parseServeCell(buf, context->servingTower);
-    return WAIT;
-}
-
-int TrackerLocation::parseCell(const char* in, CellularNeighbors& out) {
-    CellularNeighbors ret;
-    char rat[16] = {0};
-
-    auto nitems = sscanf(in, " +QENG: \"neighbourcell %*15[^\"]\",\"%15[^\"]\",%lu,%lu,%d,%d,%d",
-            rat,
-            &ret.earfcn, &ret.neighborId, &ret.signalQuality, &ret.signalPower, &ret.signalStrength);
-
-    if (nitems < 6) {
-        return SYSTEM_ERROR_NOT_ENOUGH_DATA;
-    }
-
-    if (!strncmp(rat, "CAT-M", 5)) {
-        out.rat = RadioAccessTechnology::LTE_CAT_M1;
-    }
-    else if (!strncmp(rat, "LTE", 3)) {
-        out.rat = RadioAccessTechnology::LTE;
-    }
-    else if (!strncmp(rat, "CAT-NB", 6)) {
-        out.rat = RadioAccessTechnology::LTE_NB_IOT;
-    }
-    else {
-        return SYSTEM_ERROR_NOT_SUPPORTED;
-    }
-
-    out.earfcn = ret.earfcn;
-    out.neighborId = ret.neighborId;
-    out.signalQuality = ret.signalQuality;
-    out.signalPower = ret.signalPower;
-    out.signalStrength = ret.signalStrength;
-
-    return SYSTEM_ERROR_NONE;
-}
-
-int TrackerLocation::neighbor_cb(int type, const char* buf, int len, TrackerLocation* context) {
-    if (type == TYPE_OK) {
-        return RESP_OK;
-    }
-
-    CellularNeighbors neighbor;
-    if (parseCell(buf, neighbor) == SYSTEM_ERROR_NONE) {
-        context->towerList.append(neighbor);
-    }
-
-    return WAIT;
-}
-
 size_t TrackerLocation::buildTowerInfo(JSONBufferWriter& writer, size_t size) {
     if (!_config_state_loop_safe.tower) {
         return 0;
     }
 
+    TrackerCellular::instance().startScan();
+    delay(TRACKER_CELLULAR_SCAN_DELAY);
     size_t written = writer.dataSize();
 
     // The cellular information here is always sent and not configurable
-    Cellular.command(serving_cb, this, 10000, "AT+QENG=\"servingcell\"\r\n");
+    CellularServing servingTower {};
+    TrackerCellular::instance().getServingTower(servingTower);
     if (servingTower.rat != RadioAccessTechnology::NONE) {
         writer.name("towers").beginArray();
         writer.beginObject();
@@ -858,8 +768,8 @@ size_t TrackerLocation::buildTowerInfo(JSONBufferWriter& writer, size_t size) {
         writer.name("str").value(servingTower.signalPower);
         writer.endObject();
 
-        towerList.clear();
-        (void)Cellular.command(neighbor_cb, this, 10000, "AT+QENG=\"neighbourcell\"\r\n");
+        Vector<CellularNeighbor> towerList;
+        TrackerCellular::instance().getNeighborTowers(towerList);
         auto towerCount = TrackerLocationMaxTowerSend - 1;  // one has already been taken as the serving tower
         for (auto tower: towerList) {
             if (towerCount-- <= 0) {

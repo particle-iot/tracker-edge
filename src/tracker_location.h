@@ -42,47 +42,6 @@ constexpr int TrackerLocationMaxWpsSend = 5;
 constexpr int TrackerLocationMaxTowerSend = 3;
 constexpr int NUM_OF_GEOFENCE_ZONES = 4;
 
-enum class RadioAccessTechnology {
-    NONE = -1,
-    LTE = 7,
-    LTE_CAT_M1 = 8,
-    LTE_NB_IOT = 9
-};
-
-struct CellularServing {
-    RadioAccessTechnology rat;
-    unsigned int mcc;       // 0-999
-    unsigned int mnc;       // 0-999
-    uint32_t cellId;        // 28-bits
-    unsigned int tac;       // 16-bits
-    int signalPower;
-
-    CellularServing() :
-        rat(RadioAccessTechnology::NONE),
-        mcc(0),
-        mnc(0),
-        cellId(0),
-        tac(0),
-        signalPower(0) {}
-};
-
-struct CellularNeighbors {
-    RadioAccessTechnology rat;
-    uint32_t earfcn;        // 28-bits
-    uint32_t neighborId;    // 0-503
-    int signalQuality;
-    int signalPower;
-    int signalStrength;
-
-    CellularNeighbors() :
-        rat(RadioAccessTechnology::NONE),
-        earfcn(0),
-        neighborId(0),
-        signalQuality(0),
-        signalPower(0),
-        signalStrength(0) {}
-};
-
 struct tracker_location_config_t {
     int32_t interval_min_seconds; // 0 = no min
     int32_t interval_max_seconds; // 0 = no max
@@ -284,11 +243,7 @@ class TrackerLocation
         EvaluationResults evaluatePublish(bool error);
         void buildPublish(LocationPoint& cur_loc, bool error = false);
         GnssState loopLocation(LocationPoint& cur_loc);
-        static int parseServeCell(const char* in, CellularServing& out);
         size_t buildTowerInfo(JSONBufferWriter& writer, size_t size);
-        static int serving_cb(int type, const char* buf, int len, TrackerLocation* context);
-        static int parseCell(const char* in, CellularNeighbors& out);
-        static int neighbor_cb(int type, const char* buf, int len, TrackerLocation* context);
         static void wifi_cb(WiFiAccessPoint* wap, TrackerLocation* context);
         size_t buildWpsInfo(JSONBufferWriter& writer, size_t size);
 
@@ -333,8 +288,6 @@ class TrackerLocation
         os_queue_t _enhancedLocQueue;
 
         Vector<WiFiAccessPoint> wpsList;
-        CellularServing servingTower;
-        Vector<CellularNeighbors> towerList;
 };
 
 template <typename T>
