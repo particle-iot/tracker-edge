@@ -314,13 +314,13 @@ TrackerSleepResult TrackerSleep::sleep() {
 
   if (_onNetwork) {
     config.network(NETWORK_INTERFACE_CELLULAR);
+  } else {
+    stopModem();
   }
 
   if (_onBle) {
     config.ble();
   }
-
-  stopModem();
 
   TrackerSleepContext sleepNowContext = {
     .reason = TrackerSleepReason::SLEEP,
