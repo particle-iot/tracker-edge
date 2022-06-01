@@ -36,6 +36,9 @@
 //
 // Variables that can be passed in through compile flags (not Workbench)
 //
+// Simple macro to check if the product ID needs to be specified
+#define TRACKER_PRODUCT_NEEDED                ((SYSTEM_VERSION >> 24) == 3)
+
 #ifndef TRACKER_PRODUCT_ID
 #define TRACKER_PRODUCT_ID                    (PLATFORM_ID)
 #endif
