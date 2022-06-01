@@ -406,7 +406,6 @@ class Tracker {
         static int getPowerManagementConfig(hal_power_config& conf);
         static int setPowerManagementConfig(const hal_power_config& conf);
         static int enablePowerManagement();
-        static void completeSetupDone();
         int initEsp32();
         int initCan();
         int initIo();

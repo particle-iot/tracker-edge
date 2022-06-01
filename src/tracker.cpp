@@ -474,17 +474,6 @@ void Tracker::onSleepStateChange(TrackerSleepContext context)
     }
 }
 
-void Tracker::completeSetupDone()
-{
-    // mark setup as complete to skip mobile app commissioning flow
-    uint8_t val = 0;
-    if(!dct_read_app_data_copy(DCT_SETUP_DONE_OFFSET, &val, DCT_SETUP_DONE_SIZE) && val != 1)
-    {
-        val = 1;
-        dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, DCT_SETUP_DONE_SIZE);
-    }
-}
-
 void Tracker::otaHandler(system_event_t event, int param) {
     switch ((unsigned int)param) {
         case SystemEventsParam::firmware_update_complete: {
@@ -517,8 +506,6 @@ void Tracker::otaHandler(system_event_t event, int param) {
 
 void Tracker::startup()
 {
-    completeSetupDone();
-
     // Correct power manager states in the DCT
     enablePowerManagement();
 }
