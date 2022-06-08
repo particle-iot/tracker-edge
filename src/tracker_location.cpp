@@ -1023,6 +1023,7 @@ void TrackerLocation::loop() {
         PointData geofence_point;
         geofence_point.lat = cur_loc.latitude;
         geofence_point.lon = cur_loc.longitude;
+        geofence_point.hdop = cur_loc.horizontalDop;
 
         _geofence.UpdateGeofencePoint(geofence_point);
         _geofence.loop();
