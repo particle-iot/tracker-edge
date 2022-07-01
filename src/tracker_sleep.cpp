@@ -24,6 +24,8 @@ constexpr system_tick_t TrackerSleepMinSleepDuration = 1000; // milliseconds
 
 TrackerSleep *TrackerSleep::_instance = nullptr;
 
+Logger sleepLog("app.sleep");
+
 void TrackerSleep::handleOta(system_event_t event, int param) {
   TrackerSleep::instance().pauseSleep();
 }
@@ -228,14 +230,14 @@ int TrackerSleep::registerStateChange(SleepCallback callback) {
 }
 
 void TrackerSleep::startModem() {
-  Log.info("Starting modem");
+  sleepLog.info("Starting modem");
   _lastModemOnMs = System.millis();
   Particle.connect();
   _inFullWakeup = true;
 }
 
 void TrackerSleep::stopModem() {
-  Log.info("Stoping modem");
+  sleepLog.info("Stopping modem");
   // Explicitly disconnect from the cloud with graceful offline status message
   Particle.disconnect(CloudDisconnectOptions().graceful(true).timeout(TrackerSleepGracefulTimeout));
   waitUntil(Particle.disconnected);
@@ -252,6 +254,7 @@ TrackerSleepResult TrackerSleep::sleep() {
   // Prepare to call all of the registered sleep prep callbacks with the same message
   TrackerSleepContext sleepContext = {
     .reason = TrackerSleepReason::PREPARE_SLEEP,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -274,11 +277,11 @@ TrackerSleepResult TrackerSleep::sleep() {
   // Don't sleep if too short of duration
   bool cancelSleep = false;
   if (_nextWakeMs == 0) {
-    Log.trace("cancelled sleep because of missing wake time");
+    sleepLog.trace("cancelled sleep because of missing wake time");
     cancelSleep = true;
   }
   if (_nextWakeMs < now) {
-    Log.trace("cancelled sleep at %lu milliseconds because it is in the past", (uint32_t)_nextWakeMs);
+    sleepLog.trace("cancelled sleep at %lu milliseconds because it is in the past", (uint32_t)_nextWakeMs);
     cancelSleep = true;
   }
 
@@ -286,6 +289,7 @@ TrackerSleepResult TrackerSleep::sleep() {
     // It is not worth sleeping
     TrackerSleepContext sleepCancelContext = {
       .reason = TrackerSleepReason::CANCEL_SLEEP,
+      .result = SystemSleepResult(),
       .loop = _loopCount,
       .lastSleepMs = _lastSleepMs,
       .lastWakeMs = _lastWakeMs,
@@ -324,6 +328,7 @@ TrackerSleepResult TrackerSleep::sleep() {
 
   TrackerSleepContext sleepNowContext = {
     .reason = TrackerSleepReason::SLEEP,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -354,9 +359,10 @@ TrackerSleepResult TrackerSleep::sleep() {
   config.duration(duration);
 
   _lastRequestedWakeMs = _lastSleepMs + duration;
-  Log.info("sleeping until %lu milliseconds", (uint32_t)_lastRequestedWakeMs);
+  sleepLog.info("sleeping until %lu milliseconds", (uint32_t)_lastRequestedWakeMs);
 
   retval.result = System.sleep(config);
+
   // Capture the wake time to help calculate the next sleep cycle
   _lastWakeMs = System.millis();
 
@@ -377,6 +383,7 @@ TrackerSleepResult TrackerSleep::sleep() {
   // Call all registered callbacks for wake and provide a common context
   TrackerSleepContext wakeContext = {
     .reason = TrackerSleepReason::WAKE,
+    .result = retval.result,
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -402,6 +409,7 @@ void TrackerSleep::stateToConnecting() {
 
   TrackerSleepContext stateContext = {
     .reason = TrackerSleepReason::STATE_TO_CONNECTING,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -420,6 +428,7 @@ void TrackerSleep::stateToExecute() {
 
   TrackerSleepContext stateContext = {
     .reason = TrackerSleepReason::STATE_TO_EXECUTION,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -437,6 +446,7 @@ void TrackerSleep::stateToSleep() {
 
   TrackerSleepContext stateContext = {
     .reason = TrackerSleepReason::STATE_TO_SLEEP,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -454,6 +464,7 @@ void TrackerSleep::stateToShutdown() {
 
   TrackerSleepContext stateContext = {
     .reason = TrackerSleepReason::STATE_TO_SHUTDOWN,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -473,6 +484,7 @@ void TrackerSleep::stateToReset() {
 
   TrackerSleepContext stateContext = {
     .reason = TrackerSleepReason::STATE_TO_RESET,
+    .result = SystemSleepResult(),
     .loop = _loopCount,
     .lastSleepMs = _lastSleepMs,
     .lastWakeMs = _lastWakeMs,
@@ -522,12 +534,12 @@ int TrackerSleep::loop() {
       }
       if (_publishFlag && Particle.connected()) {
         _publishFlag = false;
-        Log.trace("published and transitioning to EXECUTE");
+        sleepLog.trace("published and transitioning to EXECUTE");
         stateToExecute();
       }
       else if (System.uptime() - _lastConnectingSec >= (uint32_t)_config_state.connecting_max_seconds) {
         TrackerLocation::instance().triggerLocPub(Trigger::IMMEDIATE, "imm");
-        Log.trace("publishing timed out and transitioning to EXECUTE");
+        sleepLog.trace("publishing timed out and transitioning to EXECUTE");
         stateToExecute();
       }
 
@@ -554,24 +566,24 @@ int TrackerSleep::loop() {
 
         // Check immediately if a full wake was requested and enter connecting state
         if (!_inFullWakeup && _fullWakeupOverride) {
-          Log.trace("full wakeup requested, connecting");
+          sleepLog.trace("full wakeup requested, connecting");
           stateToConnecting();
           break;
         }
 
         if (_pendingShutdown) {
-          Log.trace("EXECUTE time expired and transitioning to SHUTDOWN");
+          sleepLog.trace("EXECUTE time expired and transitioning to SHUTDOWN");
           stateToShutdown();
         }
         else if (_pendingReset) {
-          Log.trace("EXECUTE time expired and transitioning to RESET");
+          sleepLog.trace("EXECUTE time expired and transitioning to RESET");
           stateToReset();
         }
 
         if (!_holdSleep &&
             (System.uptime() - _lastExecuteSec >= _executeDurationSec)) {
 
-            Log.trace("EXECUTE time expired and transitioning to SLEEP");
+            sleepLog.trace("EXECUTE time expired and transitioning to SLEEP");
             stateToSleep();
         }
       }
@@ -608,15 +620,15 @@ int TrackerSleep::loop() {
 
       // There was a problem going to sleep so transition back to EXECUTE and re-evaluate
       if (result.error == TrackerSleepError::CANCELLED) {
-        Log.trace("cancelled and executing");
+        sleepLog.trace("cancelled and executing");
         stateToExecute();
       }
       else if (_fullWakeupOverride) {
-        Log.trace("woke and connecting");
+        sleepLog.trace("woke and connecting");
         stateToConnecting();
       }
       else {
-        Log.trace("woke and executing without connection");
+        sleepLog.trace("woke and executing without connection");
         stateToExecute();
       }
       break;

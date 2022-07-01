@@ -89,6 +89,7 @@ struct TrackerSleepResult {
  */
 struct TrackerSleepContext {
   TrackerSleepReason reason;      /**< Enumerated reason for the call */
+  SystemSleepResult result;       /**< System sleep result */
   size_t loop;                    /**< Loop number call made */
   uint64_t lastSleepMs;           /**< The last time, in milliseconds, the system went to sleep */
   uint64_t lastWakeMs;            /**< The last time, in milliseconds, the system woke from sleep */
