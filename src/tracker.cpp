@@ -601,7 +601,8 @@ int Tracker::init()
     // Register our own configuration settings
     registerConfig();
 
-    ret = locationService.begin(_deviceConfig.enableFastLock());
+    // TODO: Pass in a LocationServiceConfig object here
+    ret = locationService.begin(_deviceConfig.locationServiceConfig());
     if (ret)
     {
         Log.error("Failed to begin location service");

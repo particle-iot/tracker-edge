@@ -39,7 +39,9 @@ LocationService::LocationService()
 
 }
 
-int LocationService::begin(bool fastLock) {
+int LocationService::begin(const LocationServiceConfiguration& config) {
+    _deviceConfig = config;
+
     CHECK_FALSE(gps_, SYSTEM_ERROR_INVALID_STATE);
 
     pinMode(UBLOX_CS_PIN, OUTPUT);
@@ -67,7 +69,6 @@ int LocationService::begin(bool fastLock) {
             break;
         }
 
-        setFastLock(fastLock);
         return SYSTEM_ERROR_NONE;
     } while (false);
 
@@ -102,6 +103,28 @@ bool LocationService::getFastLock() {
     return false;
 }
 
+bool LocationService::configureGPS(LocationServiceConfiguration& config) {
+    bool ret = true;
+    
+    WITH_LOCK(*gps_) {
+        setFastLock(_deviceConfig.enableFastLock());
+        ret &= gps_->setMode(_deviceConfig.udrModel());
+        ret &= gps_->setIMUAlignmentAngles(
+            _deviceConfig.imuYaw(),
+            _deviceConfig.imuPitch(),
+            _deviceConfig.imuRoll()
+        );
+        ret &= gps_->setIMUAutoAlignment(_deviceConfig.enableIMUAutoAlignment());
+        ret &= gps_->setUDREnable(_deviceConfig.enableUDR());
+        ret &= gps_->setIMUtoVRP(
+            _deviceConfig.imuToVRPX(),
+            _deviceConfig.imuToVRPY(),
+            _deviceConfig.imuToVRPZ()    
+        );
+    }
+    return ret;
+}
+
 int LocationService::start(bool restart) {
     CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
 
@@ -114,6 +137,8 @@ int LocationService::start(bool restart) {
         if (ret) {
             return ret;
         }
+        
+        configureGPS(_deviceConfig);        // TODO: Add error code return
     }
 
     return SYSTEM_ERROR_NONE;

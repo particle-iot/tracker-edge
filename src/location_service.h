@@ -94,6 +94,337 @@ struct LocationStatus {
     int error;                      /**< Indication of GNSS module error */
 };
 
+#ifndef LOCATION_CONFIG_ENABLE_FAST_LOCK
+// Enable or disable faster GNSS lock based on HDOP, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_ENABLE_FAST_LOCK            (false)
+#endif
+
+#ifndef LOCATION_CONFIG_ENABLE_UDR
+// Enable or Disable Untethered Dead Reckoning, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_ENABLE_UDR                  (false)
+#endif
+
+#ifndef LOCATION_CONFIG_UDR_DYNAMIC_MODEL
+// Set Dynamic Model for Untethered Dead Reckoning, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_UDR_DYNAMIC_MODEL           (UBX_DYNAMIC_MODEL_PORTABLE)
+#endif
+
+#ifndef LOCATION_CONFIG_IMU_ORIENTATION_YAW
+// Set IMU orientation yaw angles, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_IMU_ORIENTATION_YAW         (0.0)
+#endif
+
+#ifndef LOCATION_CONFIG_IMU_ORIENTATION_PITCH
+// Set IMU orientation pitch angles, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_IMU_ORIENTATION_PITCH       (0.0)
+#endif
+
+#ifndef LOCATION_CONFIG_IMU_ORIENTATION_ROLL
+// Set IMU orientation roll angles, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_IMU_ORIENTATION_ROLL        (0.0)
+#endif
+
+#ifndef LOCATION_CONFIG_ENABLE_AUTO_IMU_ALIGNMENT
+// Enable or disable automatic IMU alignment, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_ENABLE_AUTO_IMU_ALIGNMENT   (false)
+#endif
+
+/**
+ * @brief LocationServiceConfiguration class to configure the tracker device in application
+ *
+ */
+class LocationServiceConfiguration {
+public:
+    /**
+     * @brief Construct a new Tracker Configuration object
+     *
+     */
+    LocationServiceConfiguration() :
+        _enableFastLock(LOCATION_CONFIG_ENABLE_FAST_LOCK),
+        _enableUDR(LOCATION_CONFIG_ENABLE_UDR),
+        _udrDynamicModel(LOCATION_CONFIG_UDR_DYNAMIC_MODEL),
+        _imuYaw(LOCATION_CONFIG_IMU_ORIENTATION_YAW),
+        _imuPitch(LOCATION_CONFIG_IMU_ORIENTATION_PITCH),
+        _imuRoll(LOCATION_CONFIG_IMU_ORIENTATION_ROLL),
+        _enableIMUAutoAlignment(LOCATION_CONFIG_ENABLE_AUTO_IMU_ALIGNMENT) {
+    }
+
+    /**
+     * @brief Construct a new Tracker Configuration object
+     *
+     */
+    LocationServiceConfiguration(LocationServiceConfiguration&&) = default;
+
+    /**
+     * @brief Enable or disable faster GNSS lock based on HDOP.  May result in poor horizontal accuracy.
+     *
+     * @param enable Use faster method for GNSS lock state
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& enableFastLock(bool enable) {
+        _enableFastLock = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if faster GNSS lock based on HDOP is enabled.
+     *
+     * @return true Faster GNSS lock is enabled
+     * @return false Faster GNSS lock is disabled
+     */
+    bool enableFastLock() const {
+        return _enableFastLock;
+    }
+
+    /**
+     * @brief Enable or disable Untethered Dead Reckoning
+     *
+     * @param enable Enable or disable Untethered Dead Reckoning
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& enableUDR(bool enable) {
+        _enableUDR = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if faster GNSS lock based on HDOP is enabled.
+     *
+     * @return true Faster GNSS lock is enabled
+     * @return false Faster GNSS lock is disabled
+     */
+    bool enableUDR() const {
+        return _enableUDR;
+    }
+
+    /**
+     * @brief Set the Dynamic Model used for Untethered Dead Reckoning
+     *
+     * @param model Untethered Dead Reckoning model
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& udrModel(ubx_dynamic_model_t model) {
+        _udrDynamicModel = model;
+        return *this;
+    }
+
+    /**
+     * @brief Get model configured for Untethered Dead Reckoning
+     *
+     * @return ubx_dynamic_model_t
+     */
+    ubx_dynamic_model_t udrModel() const {
+        return _udrDynamicModel;
+    }
+
+    /**
+     * @brief Enable or disable automatic IMU alignment process
+     *
+     * @param enable Enable or disable Untethered Dead Reckoning
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& enableIMUAutoAlignment(bool enable) {
+        _enableIMUAutoAlignment = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if automatic IMU alignment process is enabled
+     *
+     * @return true IMU auto alignment is enabled
+     * @return false  IMU auto alignment is disabled
+     */
+    bool enableIMUAutoAlignment() const {
+        return _enableIMUAutoAlignment;
+    }
+
+    /**
+     * @brief Set orientation angles for manual IMU alignment
+     *
+     * @param[in] yaw Yaw angle of IMU
+     * @param[in] pitch Pitch angle of IMU
+     * @param[in] roll Roll angle of IMU
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuOrientationAngles(double yaw, double pitch, double roll) {
+        _imuYaw = yaw;
+        _imuPitch = pitch;
+        _imuRoll = roll;
+        return *this;
+    }
+
+    /**
+     * @brief Set Yaw angle for manual IMU alignment
+     *
+     * @param[in] yaw Yaw angle of IMU
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuYaw(double yaw) {
+        _imuYaw = yaw;
+        return *this;
+    }
+
+    /**
+     * @brief Get IMU orientation yaw angle
+     *
+     * @return yaw angle
+     */
+    double imuYaw() const {
+        return _imuYaw;
+    }
+
+    /**
+     * @brief Set Pitch angle for manual IMU alignment
+     *
+     * @param[in] pitch Pitch angle of IMU
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuPitch(double pitch) {
+        _imuPitch = pitch;
+        return *this;
+    }
+
+    /**
+     * @brief Get IMU orientation pitch angle
+     *
+     * @return pitch angle
+     */
+    double imuPitch() const {
+        return _imuPitch;
+    }
+
+    /**
+     * @brief Set Roll angle for manual IMU alignment
+     *
+     * @param[in] roll Roll angle of IMU
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuRoll(double roll) {
+        _imuRoll = roll;
+        return *this;
+    }
+
+    /**
+     * @brief Get IMU orientation roll angle
+     *
+     * @return roll angle
+     */
+    double imuRoll() const {
+        return _imuRoll;
+    }
+
+    /**
+     * @brief Set IMU to Vehicle Reference Point distance
+     *
+     * @param[in] x IMU to VRP X distance (cm)
+     * @param[in] y IMU to VRP Y distance (cm)
+     * @param[in] z IMU to VRP Z distance (cm)
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuToVRP(int16_t x, int16_t y, int16_t z) {
+        _imuVRPX = x;
+        _imuVRPY = y;
+        _imuVRPZ = z;
+        return *this;
+    }
+
+    /**
+     * @brief Set IMU to Vehicle Reference Point distance, X-dimension
+     *
+     * @param[in] x IMU to VRP X distance (cm)
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuToVRPX(int16_t x) {
+        _imuVRPX = x;
+        return *this;
+    }
+
+    /**
+     * @brief Get IMU to Vehicle Reference Point distance, X-dimension
+     *
+     * @return IMU to VRP X distance (cm)
+     */
+    int16_t imuToVRPX() const {
+        return _imuVRPX;
+    }
+
+    /**
+     * @brief Set IMU to Vehicle Reference Point distance, y dimension
+     *
+     * @param[in] y IMU to VRP Y distance (cm)
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuToVRPY(int16_t y) {
+        _imuVRPY = y;
+        return *this;
+    }
+
+    /**
+     * @brief Get IMU to Vehicle Reference Point distance, Y-dimension
+     *
+     * @return IMU to VRP Y distance (cm)
+     */
+    int16_t imuToVRPY() const {
+        return _imuVRPY;
+    }
+
+    /**
+     * @brief Set IMU to Vehicle Reference Point distance, Z-dimension
+     *
+     * @param[in] x IMU to VRP Z distance (cm)
+     * @return LocationServiceConfiguration&
+     */
+    LocationServiceConfiguration& imuToVRPZ(int16_t z) {
+        _imuVRPZ = z;
+        return *this;
+    }
+
+    /**
+     * @brief Get IMU to Vehicle Reference Point distance, Z-dimension
+     *
+     * @return IMU to VRP Z distance (cm)
+     */
+    int16_t imuToVRPZ() const {
+        return _imuVRPZ;
+    }
+
+    LocationServiceConfiguration& operator=(const LocationServiceConfiguration& rhs) {
+        if (this == &rhs) {
+            return *this;
+        }
+        this->_enableFastLock = rhs._enableFastLock;
+        this->_enableUDR = rhs._enableUDR;
+        this->_udrDynamicModel = rhs._udrDynamicModel;
+        this->_imuYaw = rhs._imuYaw;
+        this->_imuPitch = rhs._imuPitch;
+        this->_imuRoll = rhs._imuRoll;
+        this->_enableIMUAutoAlignment = rhs._enableIMUAutoAlignment;
+        this->_imuVRPX = rhs._imuVRPX;
+        this->_imuVRPY = rhs._imuVRPY;
+        this->_imuVRPZ = rhs._imuVRPZ;
+
+        return *this;
+    }
+
+    // TODO might want a comparison "==" operator to help with cases in which the configuration
+    // is updated in-flight and needs to be verified against the current configuration
+
+private:
+    bool _enableFastLock;
+    
+    // Untethered Dead Reckoning config
+    bool _enableUDR;
+    ubx_dynamic_model_t _udrDynamicModel;
+    double _imuYaw, _imuPitch, _imuRoll;
+    bool _enableIMUAutoAlignment;
+    int16_t _imuVRPX, _imuVRPY, _imuVRPZ;
+    
+    // TODO: enable 2D only fix?
+    // TODO: Assist Now Autonomous configuration
+    // TODO: Assist Now Online/Offline configuration
+    // TODO: HDOP max default?
+};
+
 /**
  * @brief Motion service class to configure and service intertial motion unit events.
  *
@@ -129,7 +460,7 @@ public:
      * @retval SYSTEM_ERROR_INVALID_ARGUMENT
      * @retval SYSTEM_ERROR_IO
      */
-    int begin(bool fastLock = false);
+    int begin(const LocationServiceConfiguration& config);
 
     /**
      * @brief Set the GNSS fast lock
@@ -254,12 +585,16 @@ public:
      */
     bool isActive() {
         return gps_->is_active();
-    };
+    }; 
+
+    // TODO: Getters and setters for config object — need to support config service
 
 private:
 
     LocationService();
     static LocationService *_instance;
+
+    LocationServiceConfiguration _deviceConfig;
 
     void cleanup();
 
@@ -287,6 +622,14 @@ private:
      * @retval SYSTEM_ERROR_INVALID_STATE
      */
     int getWayPoint(PointThreshold& point);
+
+    /**
+     * @brief Set up the GPS with advanced configuration options
+     *
+     * @return true success
+     * @return false failure
+     */
+    bool configureGPS(LocationServiceConfiguration& config);
 
     RecursiveMutex pointMutex_;
     uint16_t selectPin_;

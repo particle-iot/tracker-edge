@@ -89,9 +89,8 @@ public:
     TrackerConfiguration() :
         _enableIo(TRACKER_CONFIG_ENABLE_IO),
         _enableIoSleep(TRACKER_CONFIG_ENABLE_IO_SLEEP),
-        _enableFastLock(TRACKER_CONFIG_ENABLE_FAST_LOCK),
-        _gnssRetryCount(TRACKER_CONFIG_GNSS_RETRY_COUNT) {
-
+        _gnssRetryCount(TRACKER_CONFIG_GNSS_RETRY_COUNT),
+        _locationServiceConfig(LocationServiceConfiguration()) {
     }
 
     /**
@@ -149,7 +148,7 @@ public:
      * @return TrackerConfiguration&
      */
     TrackerConfiguration& enableFastLock(bool enable) {
-        _enableFastLock = enable;
+        _locationServiceConfig.enableFastLock(enable);
         return *this;
     }
 
@@ -160,7 +159,7 @@ public:
      * @return false Faster GNSS lock is disabled
      */
     bool enableFastLock() const {
-        return _enableFastLock;
+        return _locationServiceConfig.enableFastLock();
     }
 
     /**
@@ -183,22 +182,42 @@ public:
         return _gnssRetryCount;
     }
 
+    /**
+     * @brief Set LocationServiceConfiguration object
+     *
+     * @param locServConfig config object for the Location Service
+     * @return TrackerConfiguration&
+     */
+    TrackerConfiguration& locationServiceConfig(LocationServiceConfiguration& locServConfig) {
+        _locationServiceConfig = locServConfig;
+        return *this;
+    }
+
+    /**
+     * @brief Get LocationServiceConfiguration object
+     *
+     * @return Location Service configuration object reference
+     */
+    LocationServiceConfiguration& locationServiceConfig() {
+        return _locationServiceConfig;
+    }
+
     TrackerConfiguration& operator=(const TrackerConfiguration& rhs) {
         if (this == &rhs) {
             return *this;
         }
         this->_enableIo = rhs._enableIo;
         this->_enableIoSleep = rhs._enableIoSleep;
-        this->_enableFastLock = rhs._enableFastLock;
         this->_gnssRetryCount = rhs._gnssRetryCount;
+        this->_locationServiceConfig = rhs._locationServiceConfig;
 
         return *this;
     }
 private:
     bool _enableIo;
     bool _enableIoSleep;
-    bool _enableFastLock;
     unsigned int _gnssRetryCount;
+    LocationServiceConfiguration _locationServiceConfig;
 };
 
 // this class encapsulates the underlying modules and builds on top of them to
