@@ -123,3 +123,5 @@
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     #define RTC_WDT_DISABLE   // Always needs to be disabled for Tracker-M
 #endif
+#define TRACKER_89503_THERMISTOR              (A3)
+//#define RTC_WDT_DISABLE

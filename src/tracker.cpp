@@ -549,6 +549,13 @@ int Tracker::init()
 
     // Disable OTA updates until after the system handler has been registered
     System.disableUpdates();
+    if(TrackerUserRGB::instance().init() == SYSTEM_ERROR_NONE)
+    {
+        TrackerUserRGB::instance().get_rgb2_instance().brightness(80);
+        TrackerUserRGB::instance().get_rgb2_instance().setPattern(LED_PATTERN_FADE);
+        TrackerUserRGB::instance().get_rgb2_instance().color(0,128,0);
+        TrackerUserRGB::instance().get_rgb2_instance().on();
+    }
 
 #ifdef TRACKER_USE_MEMFAULT
     if (nullptr == _memfault) {
@@ -623,13 +630,24 @@ int Tracker::init()
     }
 
     // Check for Tracker One hardware
-    if (_model == TRACKER_MODEL_TRACKERONE)
-    {
-        (void)GnssLedInit();
-        GnssLedEnable(true);
-        temperature_init(TRACKER_THERMISTOR,
-            [this](TemperatureChargeEvent event){ return chargeCallback(event); }
-        );
+    switch (_model) {
+        case TRACKER_MODEL_TRACKERONE: {
+            (void)GnssLedInit();
+            GnssLedEnable(true);
+            temperature_init(TRACKER_THERMISTOR,
+                [this](TemperatureChargeEvent event){ return chargeCallback(event); }
+            );
+        }
+        break;
+
+        case TRACKER_MODEL_PROJECT_89503: {
+            (void)GnssLedInit();
+            GnssLedEnable(true);            
+            temperature_init(TRACKER_89503_THERMISTOR,
+                [this](TemperatureChargeEvent event){ return chargeCallback(event); }
+            );
+        }
+        break;
     }
 
     motionService.start();

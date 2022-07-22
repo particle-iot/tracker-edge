@@ -17,6 +17,10 @@
 #include "Particle.h"
 #include "gnss_led.h"
 #include "tracker_config.h"
+#include "tracker_user_rgb.h"
+
+
+#define TRACKER_GNSS_LOCK_LED_INSTANCE                 TrackerUserRGB::instance().get_rgb1_instance() 
 
 static void GnssLedTimer();
 
@@ -29,7 +33,7 @@ static bool blinkState_ = false;
 static void GnssLedTimer() {
 
     if (!enabled) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        TRACKER_GNSS_LOCK_LED_INSTANCE.off();
         lastStatus_ = { .powered = -1, .locked = -1 };
         return;
     }
@@ -46,7 +50,14 @@ static void GnssLedTimer() {
     }
 
     if (status.error) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, (blinkState_) ? LOW : HIGH);
+        if(blinkState_)
+        {
+            TRACKER_GNSS_LOCK_LED_INSTANCE.on();
+        }
+        else
+        {
+            TRACKER_GNSS_LOCK_LED_INSTANCE.off();
+        }
         blinkState_ = !blinkState_;
         return;
     }
@@ -58,15 +69,22 @@ static void GnssLedTimer() {
     }
 
     if (status.powered == 0) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        TRACKER_GNSS_LOCK_LED_INSTANCE.off();
     }
     else if (status.locked) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, LOW);
+        TRACKER_GNSS_LOCK_LED_INSTANCE.on();
     }
     else {
         if (blinkCount_ == 0) {
             blinkCount_ = GNSS_LED_CONTROL_BLINK_PERIOD_MS / GNSS_LED_CONTROL_TIMER_PERIOD_MS;
-            digitalWrite(TRACKER_GNSS_LOCK_LED, (blinkState_) ? LOW : HIGH);
+            if(blinkState_)
+            {
+                TRACKER_GNSS_LOCK_LED_INSTANCE.on();
+            }
+            else
+            {
+                TRACKER_GNSS_LOCK_LED_INSTANCE.off();
+            }
             blinkState_ = !blinkState_;
         }
         else {
@@ -77,8 +95,10 @@ static void GnssLedTimer() {
 
 
 int GnssLedInit() {
-    pinMode(TRACKER_GNSS_LOCK_LED, OUTPUT);
-    digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+    TRACKER_GNSS_LOCK_LED_INSTANCE.setPattern(LED_PATTERN_SOLID);
+    TRACKER_GNSS_LOCK_LED_INSTANCE.brightness(80);
+    TRACKER_GNSS_LOCK_LED_INSTANCE.color(0,128,0);    
+    TRACKER_GNSS_LOCK_LED_INSTANCE.off();
     enabled = false;
 
     timer_ = new Timer(GNSS_LED_CONTROL_TIMER_PERIOD_MS, GnssLedTimer);
@@ -94,7 +114,7 @@ int GnssLedInit() {
 void GnssLedEnable(bool enable) {
     enabled = enable;
     if (!enabled) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        TRACKER_GNSS_LOCK_LED_INSTANCE.off();
     }
 }
 
