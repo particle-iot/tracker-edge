@@ -601,7 +601,6 @@ int Tracker::init()
     // Register our own configuration settings
     registerConfig();
 
-    // TODO: Pass in a LocationServiceConfig object here
     ret = locationService.begin(_deviceConfig.locationServiceConfig());
     if (ret)
     {

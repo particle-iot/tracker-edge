@@ -615,6 +615,7 @@ void TrackerLocation::onWake(TrackerSleepContext context) {
     if (result.networkNeeded) {
         enableNetwork();
         // GNSS power state handled elsewhere
+        // TODO: Need to support GNSS Warm Start when unit has been off for more than 4 hours
         Log.trace("%s needs to start the network", __FUNCTION__);
     }
     else if (_geofenceConfig.interval && _pendingGeofence) {

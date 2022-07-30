@@ -104,6 +104,8 @@ bool LocationService::getFastLock() {
 }
 
 bool LocationService::configureGPS(LocationServiceConfiguration& config) {
+    enableHotStartOnWake_ = config.enableHotStartOnWake();
+    
     bool ret = true;
     
     WITH_LOCK(*gps_) {
@@ -121,6 +123,7 @@ bool LocationService::configureGPS(LocationServiceConfiguration& config) {
             _deviceConfig.imuToVRPY(),
             _deviceConfig.imuToVRPZ()    
         );
+        ret &= gps_->setAOPSettings(_deviceConfig.enableAssistNowAutonomous());
     }
     return ret;
 }
@@ -129,16 +132,20 @@ int LocationService::start(bool restart) {
     CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
 
     if (restart && gps_->isOn()) {
+        if (enableHotStartOnWake_) {
+            CHECK_TRUE(gps_->saveOnShutdown(), SYSTEM_ERROR_INVALID_STATE);
+        }
         gps_->off();
     }
 
     if (!gps_->isOn()) {
         auto ret = gps_->on();
         if (ret) {
+            Log.error("Error %d when turning GNSS on", ret);
             return ret;
         }
-        
-        configureGPS(_deviceConfig);        // TODO: Add error code return
+        Log.info("GNSS Start");
+        CHECK_TRUE(configureGPS(_deviceConfig), SYSTEM_ERROR_INVALID_STATE);
     }
 
     return SYSTEM_ERROR_NONE;
@@ -149,6 +156,10 @@ int LocationService::stop() {
     int ret = SYSTEM_ERROR_NONE;
 
     if (gps_->isOn()) {
+        Log.info("Turning GNSS off");
+        if (enableHotStartOnWake_) {
+            CHECK_TRUE(gps_->saveOnShutdown(), SYSTEM_ERROR_INVALID_STATE);
+        }
         ret = gps_->off();
     }
 

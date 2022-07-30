@@ -129,6 +129,16 @@ struct LocationStatus {
 #define LOCATION_CONFIG_ENABLE_AUTO_IMU_ALIGNMENT   (false)
 #endif
 
+#ifndef LOCATION_CONFIG_ENABLE_HOT_START_ON_WAKE
+// Enable or disable GNSS Hot Start on Wake, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_ENABLE_HOT_START_ON_WAKE    (true)
+#endif
+
+#ifndef LOCATION_CONFIG_ENABLE_ASSISTNOW_AUTONOMOUS
+// Enable or disable uBlox AssistNow Autonomous setting, see LocationServiceConfiguration below
+#define LOCATION_CONFIG_ENABLE_ASSISTNOW_AUTONOMOUS (true)
+#endif
+
 /**
  * @brief LocationServiceConfiguration class to configure the tracker device in application
  *
@@ -146,7 +156,9 @@ public:
         _imuYaw(LOCATION_CONFIG_IMU_ORIENTATION_YAW),
         _imuPitch(LOCATION_CONFIG_IMU_ORIENTATION_PITCH),
         _imuRoll(LOCATION_CONFIG_IMU_ORIENTATION_ROLL),
-        _enableIMUAutoAlignment(LOCATION_CONFIG_ENABLE_AUTO_IMU_ALIGNMENT) {
+        _enableIMUAutoAlignment(LOCATION_CONFIG_ENABLE_AUTO_IMU_ALIGNMENT) ,
+        _enableHotStartOnWake(LOCATION_CONFIG_ENABLE_HOT_START_ON_WAKE),
+        _enableAssistNowAutonomous(LOCATION_CONFIG_ENABLE_ASSISTNOW_AUTONOMOUS) {
     }
 
     /**
@@ -179,7 +191,7 @@ public:
     /**
      * @brief Enable or disable Untethered Dead Reckoning
      *
-     * @param enable Enable or disable Untethered Dead Reckoning
+     * @@param[in] enable Enable or disable Untethered Dead Reckoning
      * @return LocationServiceConfiguration&
      */
     LocationServiceConfiguration& enableUDR(bool enable) {
@@ -200,7 +212,7 @@ public:
     /**
      * @brief Set the Dynamic Model used for Untethered Dead Reckoning
      *
-     * @param model Untethered Dead Reckoning model
+     * @@param[in] model Untethered Dead Reckoning model
      * @return LocationServiceConfiguration&
      */
     LocationServiceConfiguration& udrModel(ubx_dynamic_model_t model) {
@@ -220,7 +232,7 @@ public:
     /**
      * @brief Enable or disable automatic IMU alignment process
      *
-     * @param enable Enable or disable Untethered Dead Reckoning
+     * @@param[in] enable Enable or disable Untethered Dead Reckoning
      * @return LocationServiceConfiguration&
      */
     LocationServiceConfiguration& enableIMUAutoAlignment(bool enable) {
@@ -388,6 +400,44 @@ public:
         return _imuVRPZ;
     }
 
+    /**
+     * @brief Return if "Hot Start on Wake" is enabled
+     *
+     * @return Is "Hot Start on Wake" enabled?
+     */
+    bool enableHotStartOnWake() const {
+        return _enableHotStartOnWake;
+    }
+
+    /**
+     * @brief Set GNSS "Hot Start on Wake" enable
+     *
+     * @return LocationServiceConfiguration& object
+     */
+    LocationServiceConfiguration& enableHotStartOnWake(bool enable) {
+        _enableHotStartOnWake = enable;
+        return *this;
+    }
+
+    /**
+     * @brief Return if "AssistNow Autonomous" is enabled
+     *
+     * @return Is "AssistNow Autonomous" enabled?
+     */
+    bool enableAssistNowAutonomous() const {
+        return _enableAssistNowAutonomous;
+    }
+
+    /**
+     * @brief Set GNSS "AssistNow Autonomous" enable
+     *
+     * @return LocationServiceConfiguration& object
+     */
+    LocationServiceConfiguration& enableAssistNowAutonomous(bool enable) {
+        _enableAssistNowAutonomous = enable;
+        return *this;
+    }
+
     LocationServiceConfiguration& operator=(const LocationServiceConfiguration& rhs) {
         if (this == &rhs) {
             return *this;
@@ -402,6 +452,8 @@ public:
         this->_imuVRPX = rhs._imuVRPX;
         this->_imuVRPY = rhs._imuVRPY;
         this->_imuVRPZ = rhs._imuVRPZ;
+        this->_enableHotStartOnWake = rhs._enableHotStartOnWake;
+        this->_enableAssistNowAutonomous = rhs._enableAssistNowAutonomous;
 
         return *this;
     }
@@ -418,11 +470,8 @@ private:
     double _imuYaw, _imuPitch, _imuRoll;
     bool _enableIMUAutoAlignment;
     int16_t _imuVRPX, _imuVRPY, _imuVRPZ;
-    
-    // TODO: enable 2D only fix?
-    // TODO: Assist Now Autonomous configuration
-    // TODO: Assist Now Online/Offline configuration
-    // TODO: HDOP max default?
+    bool _enableHotStartOnWake;
+    bool _enableAssistNowAutonomous;
 };
 
 /**
@@ -587,8 +636,6 @@ public:
         return gps_->is_active();
     }; 
 
-    // TODO: Getters and setters for config object — need to support config service
-
 private:
 
     LocationService();
@@ -638,4 +685,5 @@ private:
     PointThreshold pointThreshold_;
     bool pointThresholdConfigured_;
     bool fastGnssLock_;
+    bool enableHotStartOnWake_;
 };
