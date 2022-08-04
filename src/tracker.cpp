@@ -95,7 +95,8 @@ Tracker::Tracker() :
     _chargeStatus(TrackerChargeState::CHARGE_INIT),
     _lowBatteryEvent(0),
     _evalChargingTick(0),
-    _batteryChargeEnabled(true)
+    _batterySafeToCharge(true),
+    _forceDisableCharging(false)
 {
     _cloudConfig =
     {
@@ -350,7 +351,7 @@ void Tracker::initBatteryMonitor() {
     }
 
     // Keep a handy variable to check on battery charge enablement
-    _batteryChargeEnabled = !powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING);
+    _batterySafeToCharge = !powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING);
 
     // To initialize the fuel gauge so that it provides semi-accurate readings we
     // want to ensure that the charging circuit is off when providing the
@@ -371,7 +372,8 @@ void Tracker::initBatteryMonitor() {
     // getSoC(), or reading will not have updated yet.
     delay(200);
 
-    if (_batteryChargeEnabled) {
+    _forceDisableCharging = _deviceConfig.disableCharging();
+    if (_batterySafeToCharge && !_forceDisableCharging) {
         pmic.enableCharging();
     }
     pmic.disableWatchdog();
@@ -729,9 +731,7 @@ int Tracker::reset() {
     return SYSTEM_ERROR_NONE;
 }
 
-int Tracker::enableCharging() {
-    _batteryChargeEnabled = true;
-
+int Tracker::pmicEnableCharging() {
     auto powerConfig = System.getPowerConfiguration();
     if (powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING)) {
         powerConfig.clearFeature(SystemPowerFeature::DISABLE_CHARGING);
@@ -741,9 +741,7 @@ int Tracker::enableCharging() {
     return SYSTEM_ERROR_NONE;
 }
 
-int Tracker::disableCharging() {
-    _batteryChargeEnabled = false;
-
+int Tracker::pmicDisableCharging() {
     auto powerConfig = System.getPowerConfiguration();
     if (!powerConfig.isFeatureSet(SystemPowerFeature::DISABLE_CHARGING)) {
         powerConfig.feature(SystemPowerFeature::DISABLE_CHARGING);
@@ -751,6 +749,19 @@ int Tracker::disableCharging() {
     }
 
     return SYSTEM_ERROR_NONE;
+}
+
+void Tracker::forceDisableCharging(bool value) {
+    _forceDisableCharging = value;
+
+    if (_forceDisableCharging) {
+        pmicDisableCharging();
+    }
+    else {
+        if (_batterySafeToCharge) {
+            pmicEnableCharging();
+        }
+    }
 }
 
 int Tracker::setChargeCurrent(uint16_t current) {
@@ -793,11 +804,15 @@ int Tracker::chargeCallback(TemperatureChargeEvent event) {
     }
 
     // Check if anything needs to be changed for charging
-    if (!shouldCharge && _batteryChargeEnabled) {
-        disableCharging();
+    if (!shouldCharge && _batterySafeToCharge) {
+        _batterySafeToCharge = false;
+        pmicDisableCharging();
     }
-    else if (shouldCharge && !_batteryChargeEnabled) {
-        enableCharging();
+    else if (shouldCharge && !_batterySafeToCharge) {
+        _batterySafeToCharge = true;
+        if (!_forceDisableCharging) {
+            pmicEnableCharging();
+        }
     }
 
     return SYSTEM_ERROR_NONE;

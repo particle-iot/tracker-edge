@@ -50,6 +50,11 @@
 #define TRACKER_CONFIG_ENABLE_IO_SLEEP        (false)
 #endif
 
+#ifndef TRACKER_CONFIG_DISABLE_CHARGING
+// Enable or disable LiPo charging. Also available to the user application. See TrackerConfiguration below
+#define TRACKER_CONFIG_DISABLE_CHARGING       (false)
+#endif
+
 #ifndef TRACKER_CONFIG_ENABLE_FAST_LOCK
 // Enable or disable faster GNSS lock based on HDOP, see TrackerConfiguration below
 #define TRACKER_CONFIG_ENABLE_FAST_LOCK       (false)
@@ -89,6 +94,7 @@ public:
     TrackerConfiguration() :
         _enableIo(TRACKER_CONFIG_ENABLE_IO),
         _enableIoSleep(TRACKER_CONFIG_ENABLE_IO_SLEEP),
+        _disableCharging(TRACKER_CONFIG_DISABLE_CHARGING),
         _gnssRetryCount(TRACKER_CONFIG_GNSS_RETRY_COUNT),
         _locationServiceConfig(LocationServiceConfiguration()) {
     }
@@ -139,6 +145,27 @@ public:
      */
     bool enableIoCanPowerSleep() const {
         return _enableIoSleep;
+    }
+
+    /**
+     * @brief Disable or enable LiPo battery charging. Can be overridden in the user app with forceDisableCharging()
+     *
+     * @param disable Disable charging of the LiPo
+     * @return TrackerConfiguration&
+     */
+    TrackerConfiguration& disableCharging(bool disable) {
+        _disableCharging = disable;
+        return *this;
+    }
+
+    /**
+     * @brief Indicate if charging is disabled or not
+     *
+     * @return true Charging is disabled
+     * @return false Charging is enabled
+     */
+    bool disableCharging() const {
+        return _disableCharging;
     }
 
     /**
@@ -208,6 +235,7 @@ public:
         }
         this->_enableIo = rhs._enableIo;
         this->_enableIoSleep = rhs._enableIoSleep;
+        this->_disableCharging = rhs._disableCharging;
         this->_gnssRetryCount = rhs._gnssRetryCount;
         this->_locationServiceConfig = rhs._locationServiceConfig;
 
@@ -216,6 +244,7 @@ public:
 private:
     bool _enableIo;
     bool _enableIoSleep;
+    bool _disableCharging;
     unsigned int _gnssRetryCount;
     LocationServiceConfiguration _locationServiceConfig;
 };
@@ -321,18 +350,12 @@ class Tracker {
         }
 
         /**
-         * @brief Enable battery charging
+         * @brief Manually force off battery charging
          *
-         * @retval SYSTEM_ERROR_NONE
+         * @param value true charging will be disabled (not re-enabled by Tracker Edge)
+         * @param value false charging will revert to original logic (handled by Tracker Edge)
          */
-        int enableCharging();
-
-        /**
-         * @brief Disable battery charging
-         *
-         * @retval SYSTEM_ERROR_NONE
-         */
-        int disableCharging();
+        void forceDisableCharging(bool value);
 
         /**
          * @brief Force battery charge current
@@ -426,7 +449,8 @@ class Tracker {
         TrackerChargeState _chargeStatus;
         unsigned int _lowBatteryEvent;
         unsigned int _evalChargingTick;
-        bool _batteryChargeEnabled;
+        bool _batterySafeToCharge;
+        bool _forceDisableCharging;
         bool _deviceMonitoring {false};
 
         // Startup and initialization related
@@ -457,6 +481,8 @@ class Tracker {
         void initBatteryMonitor();
         bool getChargeEnabled();
         void evaluateBatteryCharge();
+        int pmicEnableCharging();
+        int pmicDisableCharging();
 
         /**
          * @brief Handle OTA events from System.on() interface
