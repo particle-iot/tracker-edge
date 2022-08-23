@@ -13,3 +13,6 @@
 [submodule "lib/geofence"]
 	path = lib/geofence
 	url = https://github.com/particle-iot/geofence.git
+[submodule "lib/memfault"]
+	path = lib/memfault
+	url = https://github.com/memfault/particle-firmware-library.git

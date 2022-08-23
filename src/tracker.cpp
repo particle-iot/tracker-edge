@@ -41,6 +41,10 @@ constexpr uint16_t TrackerInputCurrent = 1500; // milliamps
 constexpr unsigned int TrackerFailedOtaKeepAwake = 60; // seconds to stay awake after failed OTA
 constexpr system_tick_t TrackerWatchdogExpireTime = 60 * 1000; // milliseconds to expire the WDT
 
+constexpr float TrackerMemfaultBatteryScaling = 10.0f; // scaling for battery SOC reporting
+constexpr float TrackerMemfaultTemperatureScaling = 10.0f; // scaling for temperature reporting
+constexpr float TrackerMemfaultTemperatureInvalid = -300.0f; // invalid temperature
+
 void ctrl_request_custom_handler(ctrl_request* req)
 {
     auto result = SYSTEM_ERROR_NOT_SUPPORTED;
@@ -58,6 +62,11 @@ void ctrl_request_custom_handler(ctrl_request* req)
     }
 
     system_ctrl_set_result(req, result, nullptr, nullptr, nullptr);
+}
+
+void memfault_metrics_heartbeat_collect_data(void)
+{
+    Tracker::instance().collectMemfaultHeartbeatMetrics();
 }
 
 Tracker *Tracker::_instance = nullptr;
@@ -91,6 +100,21 @@ Tracker::Tracker() :
     {
         .UsbCommandEnable = true,
     };
+}
+
+void Tracker::collectMemfaultHeartbeatMetrics() {
+    memfault_metrics_heartbeat_set_unsigned(
+        MEMFAULT_METRICS_KEY(Bat_Soc), (uint32_t)(System.batteryCharge() * TrackerMemfaultBatteryScaling));
+
+    if (_model == TRACKER_MODEL_TRACKERONE) {
+        auto temperature = get_temperature();
+
+        memfault_metrics_heartbeat_set_signed(
+            MEMFAULT_METRICS_KEY(Tracker_TempC), (int32_t)(temperature * TrackerMemfaultTemperatureScaling));
+    } else {
+        memfault_metrics_heartbeat_set_signed(
+            MEMFAULT_METRICS_KEY(Tracker_TempC), (int32_t)(TrackerMemfaultTemperatureInvalid * TrackerMemfaultTemperatureScaling));
+    }
 }
 
 int Tracker::registerConfig()
@@ -519,6 +543,10 @@ int Tracker::init()
     // Disable OTA updates until after the system handler has been registered
     System.disableUpdates();
 
+    if (nullptr == _memfault) {
+        _memfault = new Memfault(TRACKER_PRODUCT_VERSION);
+    }
+
 #ifndef TRACKER_MODEL_NUMBER
     ret = hal_get_device_hw_model(&_model, &_variant, nullptr);
     if (ret)
@@ -547,6 +575,17 @@ int Tracker::init()
         BLE.selectAntenna(BleAntennaType::EXTERNAL);
         initBatteryMonitor();
     }
+
+    // Setup device monitoring configuration here
+    static ConfigObject deviceMonitoringDesc
+    (
+        "monitoring",
+        {
+            ConfigBool("device_monitor", &_deviceMonitoring)
+        }
+    );
+
+    ConfigService::instance().registerModule(deviceMonitoringDesc);
 
     cloudService.init();
 
@@ -658,6 +697,9 @@ void Tracker::loop()
     // fast operations for every loop
     cloudService.tick();
     configService.tick();
+    if (_deviceMonitoring && (nullptr != _memfault)) {
+        _memfault->process();
+    }
     location.loop();
 }
 

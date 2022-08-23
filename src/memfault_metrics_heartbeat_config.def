@@ -1,0 +1,11 @@
+// ----------------------------------------------------------------------------
+// Definitions for Tracker Edge specific metrics.
+// ----------------------------------------------------------------------------
+
+// Metric for battery state-of-charge
+// Unit: Tenths of a percent
+MEMFAULT_METRICS_KEY_DEFINE(Bat_Soc, kMemfaultMetricType_Unsigned)
+
+// Metric for system temperature
+// Unit: Tenths of a degree Celsius
+MEMFAULT_METRICS_KEY_DEFINE(Tracker_TempC, kMemfaultMetricType_Signed)

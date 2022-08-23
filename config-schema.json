@@ -363,6 +363,26 @@
 				}
 			}
 		},
+		"monitoring": {
+			"$id": "#/properties/monitoring",
+			"type": "object",
+			"title": "Device Monitoring",
+			"description": "Configuration for device monitoring specific settings",
+			"default": {},
+			"minimumFirmwareVersion": 18,
+			"properties": {
+				"device_monitor": {
+					"$id": "#/properties/monitoring/device_monitor",
+					"type": "boolean",
+					"title": "Device Monitoring",
+					"description": "If enabled, device will publish metrics and fault details.",
+					"default": false,
+					"examples": [
+						false
+					]
+				}
+			}
+		},
 		"geofence": {
 			"$id": "#/properties/geofence",
 			"type": "object",
