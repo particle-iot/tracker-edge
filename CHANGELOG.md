@@ -1,3 +1,32 @@
+## v18
+
+### COMPATIBILTY
+
+Must be built using device OS v3.2.0 or greater.
+
+### FEATURES
+
+- Store and Forward feature for saving publish data while offline.
+- Added support for Memfault device monitoring.
+- Added battery charging configuration overrides.
+
+### ENHANCEMENTS
+
+- Added a new log category for TrackerSleep class.
+- Added more control for GNSS module dead reckoning.
+- Added GNSS enhancements for time-to-first-fix (TTFF).
+
+### BUGFIXES
+
+- Fix setting of HDOP to geofence zones.
+
+### OTHER CHANGES
+
+- Add configuration schema file to the project.
+- Cleared several compile warnings.
+- Changes for building under device OS versions above 3.x.
+
+
 ## v17
 
 ### COMPATIBILTY
