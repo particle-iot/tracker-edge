@@ -20,7 +20,8 @@
 #include "tracker_cellular.h"
 #include "mcp_can.h"
 #include "LocationPublish.h"
-#include "EdgePlatform.h"
+#include "Adp8866GnssLed.hpp"
+#include "IoGnssLed.hpp"
 
 // Defines and constants
 constexpr int CanSleepRetries = 10; // Based on a series of 10ms delays
@@ -632,7 +633,7 @@ int Tracker::init()
     // Check for Tracker One hardware
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE: {
-            (void)GnssLedInit();
+            (void)GnssLedInit(new IoGnssLed(TRACKER_GNSS_LOCK_LED));
             GnssLedEnable(true);
             temperature_init(TRACKER_THERMISTOR,
                 [this](TemperatureChargeEvent event){ return chargeCallback(event); }
@@ -641,7 +642,7 @@ int Tracker::init()
         break;
 
         case TRACKER_MODEL_PROJECT_89503: {
-            (void)GnssLedInit();
+            (void)GnssLedInit(new Adp8866GnssLed(TrackerUserRGB::instance().get_rgb1_instance()));
             GnssLedEnable(true);            
             temperature_init(TRACKER_89503_THERMISTOR,
                 [this](TemperatureChargeEvent event){ return chargeCallback(event); }
