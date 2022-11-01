@@ -17,10 +17,13 @@
 #pragma once
 
 #include "location_service.h"
+#include "IGnssLed.hpp"
+
+using namespace particle;
 
 constexpr system_tick_t GNSS_LED_CONTROL_TIMER_PERIOD_MS = 50;
 constexpr system_tick_t GNSS_LED_CONTROL_BLINK_PERIOD_MS = 250;
 
-int GnssLedInit();
+int GnssLedInit(IGnssLed *pInstance);
 void GnssLedEnable(bool enable);
 void GnssLedError();
