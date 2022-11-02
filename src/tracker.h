@@ -79,6 +79,13 @@ enum class TrackerChargeState {
     CHARGE_CARE,
 };
 
+enum class TrackerPmicChargeTimer {
+    CHARGE_00_05_HOURS = 0,         // 00 – 5  hrs
+    CHARGE_01_08_HOURS,             // 01 – 8  hrs
+    CHARGE_10_12_HOURS,             // 10 – 12 hrs
+    CHARGE_11_20_HOURS,             // 11 – 20 hrs
+};
+
 struct TrackerChargeStatus {
     unsigned int uptime;
     TrackerChargeState state;
@@ -496,4 +503,7 @@ class Tracker {
          * @param data Particular event
          */
         void otaHandler(system_event_t event, int data);
+
+        // Update PMIC Charge Timer
+        void updatePmicChargeTimer(TrackerPmicChargeTimer timer);        
 };

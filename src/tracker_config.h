@@ -47,7 +47,7 @@
 #endif
 
 #ifndef TRACKER_PRODUCT_VERSION
-#define TRACKER_PRODUCT_VERSION               (18)
+#define TRACKER_PRODUCT_VERSION               (111)
 #endif
 
 #if ( (SYSTEM_VERSION < SYSTEM_VERSION_ALPHA(5, 0, 0, 1)) && (PLATFORM_ID == PLATFORM_TRACKER) )
@@ -111,9 +111,10 @@
 #endif 
 #define MCP_CAN_INT_PIN                       (CAN_INT)
 
-#define RTC_AM1805_I2C_INSTANCE               (Wire1)
-#define RTC_AM1805_I2C_ADDR                   (HAL_PLATFORM_EXTERNAL_RTC_I2C_ADDR)
 
+//
+// Tracker One Specifc IO
+//
 #define TRACKER_THERMISTOR                    (A0)
 #define TRACKER_USER_BUTTON                   (D1)
 #define TRACKER_GNSS_LOCK_LED                 (D2)
@@ -124,4 +125,14 @@
     #define RTC_WDT_DISABLE   // Always needs to be disabled for Tracker-M
 #endif
 #define TRACKER_89503_THERMISTOR              (A3)
+#define TRACKER_89503_USER_BUTTON             (D2)
+#define TRACKER_89503_VIN_EN_PIN              (NFC_PIN2)
+
+#define TRACKER_89503_STS3X_I2C_INSTANCE      (Wire)
+#define TRACKER_89503_STS3X_I2C_ADDR          (0x4a)
+
+#define TRACKER_89503_ADP8866_I2C_INSTANCE    (Wire)
+#define TRACKER_89503_ADP8866_I2C_ADDR        (0x27)
+#define TRACKER_89503_ADP8866_RESETN_PIN      (NFC_PIN1)
+
 //#define RTC_WDT_DISABLE

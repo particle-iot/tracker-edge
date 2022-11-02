@@ -28,3 +28,6 @@
 [submodule "lib/particle-led"]
 	path = lib/particle-led
 	url = https://github.com/particle-iot/particle-led.git
+[submodule "lib/model_gauge"]
+	path = lib/model_gauge
+	url = https://github.com/particle-iot/model_gauge.git
