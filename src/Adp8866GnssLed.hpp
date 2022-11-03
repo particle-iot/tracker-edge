@@ -13,6 +13,9 @@ namespace particle
         {
         }
 
+        /**
+         * @brief Initialize resource for GNSS LED
+         */
         void init()
         {
             _instace.setPattern(LED_PATTERN_SOLID);
@@ -21,16 +24,21 @@ namespace particle
             off();
         }
 
+        /**
+         * @brief set LED on
+         */
         void on()
         {
             _instace.on();
         }
 
+        /**
+         * @brief set LED off
+         */
         void off()
         {
             _instace.off();
         }
-
     private:
         ADP8866_RGB &_instace;
     };
