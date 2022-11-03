@@ -387,8 +387,8 @@ void Tracker::initBatteryMonitor() {
     // getSoC(), or reading will not have updated yet.
     delay(200);
 
-    //if (_batteryChargeEnabled) {
-    {
+    _forceDisableCharging = _deviceConfig.disableCharging();
+    if (_batterySafeToCharge && !_forceDisableCharging) {
         pmic.enableCharging();
     }
     pmic.disableWatchdog();
@@ -452,39 +452,37 @@ void Tracker::evaluateBatteryCharge() {
         return;
     }
 
-    // NOTE: Disabling shutdown for testing reasons
-    //
-    // switch (_chargeStatus) {
-    //     case TrackerChargeState::CHARGE_CARE: {
-    //         if (_lowBatteryEvent || (stateOfCharge <= (float)TrackerLowBatteryCutoff)) {
-    //             // Publish then shutdown
-    //             Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
-    //             startLowBatteryShippingMode();
-    //         }
-    //         else if (!_pastWarnLimit && (stateOfCharge <= (float)TrackerLowBatteryWarning)) {
-    //             _pastWarnLimit = true;
-    //             // Publish once when falling through this value
-    //             Particle.publishVitals();
-    //             location.triggerLocPub(Trigger::IMMEDIATE,"batt_warn");
-    //             Log.warn("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Publishing warning", stateOfCharge, (float)TrackerLowBatteryWarning);
-    //         }
-    //         break;
-    //     }
+    switch (_chargeStatus) {
+        case TrackerChargeState::CHARGE_CARE: {
+            if (_lowBatteryEvent || (stateOfCharge <= (float)TrackerLowBatteryCutoff)) {
+                // Publish then shutdown
+                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
+                startLowBatteryShippingMode();
+            }
+            else if (!_pastWarnLimit && (stateOfCharge <= (float)TrackerLowBatteryWarning)) {
+                _pastWarnLimit = true;
+                // Publish once when falling through this value
+                Particle.publishVitals();
+                location.triggerLocPub(Trigger::IMMEDIATE,"batt_warn");
+                Log.warn("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Publishing warning", stateOfCharge, (float)TrackerLowBatteryWarning);
+            }
+            break;
+        }
 
-    //     case TrackerChargeState::CHARGE_DONT_CARE: {
-    //         // There may be instances where the device is being charged but the battery is still being discharged
-    //         if (_lowBatteryEvent) {
-    //             // Publish then shutdown
-    //             Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
-    //             startLowBatteryShippingMode();
-    //         }
-    //         else if (_pastWarnLimit && (stateOfCharge >= (float)(TrackerLowBatteryWarning + TrackerLowBatteryWarningHyst))) {
-    //             _pastWarnLimit = false;
-    //             // Publish again to announce that we are out of low battery warning
-    //             Particle.publishVitals();
-    //         }
-    //     }
-    // }
+        case TrackerChargeState::CHARGE_DONT_CARE: {
+            // There may be instances where the device is being charged but the battery is still being discharged
+            if (_lowBatteryEvent) {
+                // Publish then shutdown
+                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
+                startLowBatteryShippingMode();
+            }
+            else if (_pastWarnLimit && (stateOfCharge >= (float)(TrackerLowBatteryWarning + TrackerLowBatteryWarningHyst))) {
+                _pastWarnLimit = false;
+                // Publish again to announce that we are out of low battery warning
+                Particle.publishVitals();
+            }
+        }
+    }
 }
 
 void Tracker::onSleepPrepare(TrackerSleepContext context)
@@ -872,21 +870,25 @@ int Tracker::chargeCallback(TemperatureChargeEvent event) {
             shouldCharge = false;
             break;
         }
-// TODO delete me!!!!  disabling temporarily for testing
-        // case TemperatureChargeEvent::UNDER_TEMPERATURE: {
-        //     setChargeCurrent(TrackerChargeCurrentLow);
-        //     shouldCharge = false;
-        //     break;
-        // }
+
+        case TemperatureChargeEvent::UNDER_TEMPERATURE: {
+            setChargeCurrent(TrackerChargeCurrentLow);
+            shouldCharge = false;
+            break;
+        }
     }
 
     // Check if anything needs to be changed for charging
-    // if (!shouldCharge && _batteryChargeEnabled) {
-    //     disableCharging();
-    // }
-    // else if (shouldCharge && !_batteryChargeEnabled) {
-    //     enableCharging();
-    // }
+    if (!shouldCharge && _batterySafeToCharge) {
+        _batterySafeToCharge = false;
+        pmicDisableCharging();
+    }
+    else if (shouldCharge && !_batterySafeToCharge) {
+        _batterySafeToCharge = true;
+        if (!_forceDisableCharging) {
+            pmicEnableCharging();
+        }
+    }
 
     return SYSTEM_ERROR_NONE;
 }
