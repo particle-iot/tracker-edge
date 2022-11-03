@@ -12,22 +12,30 @@ namespace particle
         {
         }
 
+        /**
+         * @brief Initialize LED pin
+         */
         void init()
         {
             pinMode(_pin, OUTPUT);
             off();
         }
 
+        /**
+         * @brief set LED on
+         */
         void on()
         {
             digitalWrite(_pin, LOW);
         }
 
+        /**
+         * @brief set LED off
+         */
         void off()
         {
             digitalWrite(_pin, HIGH);
         }
-
     private:
         uint32_t _pin;
     };
