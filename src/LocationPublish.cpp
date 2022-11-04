@@ -101,68 +101,6 @@ void LocationPublish::tick() {
     }
 }
 
-bool LocationPublish::publish(const char *name,
-                            const char *data,
-                            PublishFlags flags,
-                            int level,
-                            const void *context) {
-
-    //copy name and data to heap location
-    char* event_name = new char[strlen(name)+1]; //+1 for null terminator
-    strcpy((char*)event_name, name);
-
-    char* event_data = new char[strlen(data)+1]; //+1 for null terminator
-    strcpy((char*)event_data, data);
-
-    return BackgroundPublish::instance().publish(event_name,
-                                                event_data,
-                                                flags,
-                                                level,
-                                                &LocationPublish::publish_cb,
-                                                this,
-                                                context);
-}
-
-void LocationPublish::publish_cb(publishStatus status,
-                        const char *event_name,
-                        const char *event_data,
-                        const void *event_context) {
-    if(!event_context) {
-        return;
-    }
-
-    //delete event_name, not used anywhere else after this
-    //delete event_data, not used anywhere else since event_context is allocated
-    //from the heap and contains a String copy of event_data. The event_context
-    //is deleted later in the CloudService::send_cb_wrapper() function
-    delete[] event_name;
-    delete[] event_data;
-
-    auto send_handler {static_cast<const cloud_service_send_handler_t *>(event_context)};
-    auto &base_handler {send_handler->base_handler};
-
-    if(status == publishStatus::PUBLISH_COMPLETE) {
-        if(base_handler.cloud_flags & CloudServicePublishFlags::FULL_ACK) {
-            // expecting full end-to-end acknowledgement so set up handler waiting for the ACK
-            CloudService::instance().regCommandCallback(base_handler.cmd,
-                                                        base_handler.cb,
-                                                        base_handler.req_id,
-                                                        base_handler.timeout_ms,
-                                                        base_handler.context);
-        }
-        else {
-            cloud_service_handler_t handler {base_handler};
-            handler.status = CloudServiceStatus::SUCCESS;
-            CloudService::instance().regCommandDeferredCallback(handler);
-        }
-    }
-    else if (status == publishStatus::PUBLISH_BUSY) {
-        cloud_service_handler_t handler {base_handler};
-        handler.status = CloudServiceStatus::FAILURE;
-        CloudService::instance().regCommandDeferredCallback(handler);
-    }
-}
-
 int LocationPublish::loc_store_cb_wrapper(CloudServiceStatus status,
                                         JSONValue *rsp_root,
                                         const char *req_event,

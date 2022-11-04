@@ -408,17 +408,15 @@ int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *r
 void TrackerLocation::location_publish()
 {
     int rval;
-    CloudService &cloud_service = CloudService::instance();
-
     // maintain cloud service lock across the send to allow us to save off
     // the finalized loc publish to retry on failure
-    cloud_service.lock();
+    std::lock_guard<CloudService> lg(CloudService::instance());
 
     CloudServicePublishFlags cloud_flags =
         (_config_state.process_ack) ? CloudServicePublishFlags::FULL_ACK : CloudServicePublishFlags::NONE;
 
     // publish a new loc (contained in cloud_service buffer)
-    rval = cloud_service.send(WITH_ACK,
+    rval = CloudService::instance().send(WITH_ACK,
         cloud_flags,
         &TrackerLocation::location_publish_cb, this,
         CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
@@ -426,9 +424,8 @@ void TrackerLocation::location_publish()
     //if error issue the user defined callbacks
     if(rval)
     {
-        issue_location_publish_callbacks(CloudServiceStatus::FAILURE, NULL, cloud_service.writer().buffer());
+        issue_location_publish_callbacks(CloudServiceStatus::FAILURE, NULL, CloudService::instance().writer().buffer());
     }
-    cloud_service.unlock();
 }
 
 void TrackerLocation::enableNetwork() {

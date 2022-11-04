@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "BackgroundPublish.h"
 #include "DiskQueue.h"
 #include "cloud_service.h"
 
@@ -69,27 +68,6 @@ public:
     void tick();
 
     /**
-     * @brief Request to publish a message
-     *
-     * @details Calls the BackgroundPublish::publish() function to request
-     * a publish in the BackgroundPublish::thread_f thread.
-     *
-     * @param[in] name name of event to be sent
-     * @param[in] data pointer to string of data to send out
-     * @param[in] flags PublishFlags type for the request
-     * @param[in] level priority of message. Lowest number is highest priority.
-     * number of priorities is determined in the BackgroundPublish class.
-     * @param[in] context context for the publish that is passed to the callback
-     *
-     * @return TRUE if request accepted, FALSE if not
-     */
-    bool publish(const char *name,
-            const char *data,
-            PublishFlags flags = PRIVATE,
-            int level = 0,
-            const void *context = nullptr);
-
-    /**
      * @brief Register the callback to be called from every generated location
      * publish
      *
@@ -140,15 +118,12 @@ public:
     }
 
     /**
-     * @brief Called to cleanup the store_msg_queue, and the background publish
-     * queues. Is called if you disable the store forward feature, or reset the
-     * device to factory
+     * @brief Called to cleanup the store_msg_queue. Is called if you disable the
+     * store forward feature, or reset the device to factory
      *
-     * @details Flushes, Closes out, and deletes the store_msg_queue files, and
-     * cleans up the BackgroundPublish queue
+     * @details Flushes, Closes out, and deletes the store_msg_queue files
      */
     void factoryReset() {
-        BackgroundPublish::instance().cleanup();
         store_msg_queue.unlinkFiles(); //unlink the files first
         store_msg_queue.stop(); //then clear the files from _fileList
     }
@@ -162,24 +137,6 @@ private:
 
     DiskQueue store_msg_queue;
     StoreConfig store_config;
-
-    /**
-     * @brief Callback to be called on every publish
-     *
-     * @details This sets up the three layers of callbacks for a publish. Please
-     * see the CloudService class for more explanation these 3 layers of
-     * callbacks
-     *
-     * @param[in] status of the publish
-     * @param[in] event_name name of the event
-     * @param[in] event_data pointer to string of message published
-     * @param[in] event_context context of the message to pass to the other
-     * callbacks
-     */
-    void publish_cb(publishStatus status,
-                        const char *event_name,
-                        const char *event_data,
-                        const void *event_context);
 
     /**
      * @brief Wrapper that is used to call the
