@@ -17,7 +17,6 @@
 #include "Particle.h"
 #include "gnss_led.h"
 #include "tracker_config.h"
-#include "tracker_user_rgb.h"
 
 static void GnssLedTimer();
 

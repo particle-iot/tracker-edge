@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Particle.h"
+#include "IGnssLed.hpp"
 
 typedef struct 
 {
@@ -41,6 +42,7 @@ typedef struct
     float memfaultBatteryScaling;
     float memfaultTemperatureScaling;
     float memfaultTemperatureInvalid;
+    IGnssLed *pGnssLed;
 }EdgePlatformCommonConfiguration;
 
 
@@ -69,6 +71,7 @@ public:
         commonCfg.memfaultBatteryScaling = 10.0f; // scaling for battery SOC reporting
         commonCfg.memfaultTemperatureScaling = 10.0f; // scaling for temperature reporting
         commonCfg.memfaultTemperatureInvalid = -300.0f; // invalid temperature   
+        commonCfg.pGnssLed = nullptr;
         Log.info("### %s ###",__FUNCTION__);
     }
 
