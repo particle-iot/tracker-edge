@@ -24,31 +24,6 @@
 #include "IoGnssLed.hpp"
 #include "tracker_fuelgauge.h"
 
-// Defines and constants
-constexpr int CanSleepRetries = 10; // Based on a series of 10ms delays
-
-constexpr int TrackerLowBatteryCutoff = 2; // percent of battery charge
-constexpr int TrackerLowBatteryCutoffCorrection = 1; // percent of battery charge
-constexpr int TrackerLowBatteryWarning = 8; // percent of battery charge
-constexpr int TrackerLowBatteryWarningHyst = 1; // percent of battery charge
-constexpr unsigned int TrackerLowBatteryAwakeEvalInterval = 2 * 60; // seconds to sample for low battery condition
-constexpr unsigned int TrackerLowBatterySleepEvalInterval = 1; // seconds to sample for low battery condition
-constexpr unsigned int TrackerLowBatterySleepWakeInterval = 15 * 60; // seconds to sample for low battery condition
-constexpr system_tick_t TrackerPostChargeSettleTime = 500; // milliseconds
-constexpr unsigned int TrackerLowBatteryStartTime = 20; // seconds to debounce low battery condition
-constexpr unsigned int TrackerLowBatteryDebounceTime = 5; // seconds to debounce low battery condition
-constexpr unsigned int TrackerChargingAwakeEvalTime = 10; // seconds to sample the PMIC charging state
-constexpr unsigned int TrackerChargingSleepEvalTime = 1; // seconds to sample the PMIC charging state
-constexpr uint16_t TrackerChargeCurrentHigh = 1536; // milliamps
-constexpr uint16_t TrackerChargeCurrentLow = 512; // milliamps
-constexpr uint16_t TrackerInputCurrent = 2048; // milliamps
-constexpr unsigned int TrackerFailedOtaKeepAwake = 60; // seconds to stay awake after failed OTA
-constexpr system_tick_t TrackerWatchdogExpireTime = 60 * 1000; // milliseconds to expire the WDT
-
-constexpr float TrackerMemfaultBatteryScaling = 10.0f; // scaling for battery SOC reporting
-constexpr float TrackerMemfaultTemperatureScaling = 10.0f; // scaling for temperature reporting
-constexpr float TrackerMemfaultTemperatureInvalid = -300.0f; // invalid temperature
-
 void ctrl_request_custom_handler(ctrl_request* req)
 {
     auto result = SYSTEM_ERROR_NOT_SUPPORTED;
@@ -110,16 +85,16 @@ Tracker::Tracker() :
 #ifdef TRACKER_USE_MEMFAULT
 void Tracker::collectMemfaultHeartbeatMetrics() {
     memfault_metrics_heartbeat_set_unsigned(
-        MEMFAULT_METRICS_KEY(Bat_Soc), (uint32_t)(System.batteryCharge() * TrackerMemfaultBatteryScaling));
+        MEMFAULT_METRICS_KEY(Bat_Soc), (uint32_t)(System.batteryCharge() * _commonCfgData.memfaultBatteryScaling));
 
     if (_model == TRACKER_MODEL_TRACKERONE) {
         auto temperature = get_temperature();
 
         memfault_metrics_heartbeat_set_signed(
-            MEMFAULT_METRICS_KEY(Tracker_TempC), (int32_t)(temperature * TrackerMemfaultTemperatureScaling));
+            MEMFAULT_METRICS_KEY(Tracker_TempC), (int32_t)(temperature * _commonCfgData.memfaultTemperatureScaling));
     } else {
         memfault_metrics_heartbeat_set_signed(
-            MEMFAULT_METRICS_KEY(Tracker_TempC), (int32_t)(TrackerMemfaultTemperatureInvalid * TrackerMemfaultTemperatureScaling));
+            MEMFAULT_METRICS_KEY(Tracker_TempC), (int32_t)(_commonCfgData.memfaultTemperatureInvalid * _commonCfgData.memfaultTemperatureScaling));
     }
 }
 #endif // TRACKER_USE_MEMFAULT
@@ -254,7 +229,7 @@ void Tracker::enableWatchdog(bool enable) {
 #ifndef RTC_WDT_DISABLE
     if (enable) {
         // watchdog at 1 minute
-        hal_exrtc_enable_watchdog(TrackerWatchdogExpireTime, nullptr);
+        hal_exrtc_enable_watchdog(_commonCfgData.watchdogExpireTime, nullptr);
         hal_exrtc_feed_watchdog(nullptr);
     }
     else {
@@ -355,11 +330,11 @@ void Tracker::initBatteryMonitor() {
     //     powerConfig.powerSourceMaxCurrent(TrackerInputCurrent);
     //     System.setPowerConfiguration(powerConfig);
     // }
-    if ((powerConfig.batteryChargeCurrent() != TrackerChargeCurrentHigh) ||
-        (powerConfig.powerSourceMaxCurrent() != TrackerInputCurrent)) {
+    if ((powerConfig.batteryChargeCurrent() != _commonCfgData.chargeCurrentHigh) ||
+        (powerConfig.powerSourceMaxCurrent() != _commonCfgData.inputCurrent)) {
 
-        powerConfig.batteryChargeCurrent(TrackerChargeCurrentHigh);
-        powerConfig.powerSourceMaxCurrent(TrackerInputCurrent);
+        powerConfig.batteryChargeCurrent(_commonCfgData.chargeCurrentHigh);
+        powerConfig.powerSourceMaxCurrent(_commonCfgData.inputCurrent);
         System.setPowerConfiguration(powerConfig);
     }
 
@@ -378,7 +353,7 @@ void Tracker::initBatteryMonitor() {
     pmic.setWatchdog(0x1); // 40 seconds
     pmic.disableCharging();
     // Delay so that the bulk capacitance and battery can equalize
-    delay(TrackerPostChargeSettleTime);
+    delay(_commonCfgData.postChargeSettleTime);
 
     TrackerFuelGauge::instance().init();
 
@@ -402,7 +377,7 @@ void Tracker::evaluateBatteryCharge() {
     // This is delayed intialization for the fuel gauge threshold since power on
     // events may glitch between battery states easily.
     if (_delayedBatteryCheck) {
-        if (System.uptime() >= TrackerLowBatteryStartTime) {
+        if (System.uptime() >= _commonCfgData.lowBatteryStartTime) {
             _delayedBatteryCheck = false;
             FuelGauge fuelGauge;
 
@@ -410,7 +385,7 @@ void Tracker::evaluateBatteryCharge() {
             // threshold value provided by the fuel gauge.
             // The fuel gauge will only give an alert when passing through this limit with decreasing
             // succesive charge amounts.  It is important to check whether we are already below this limit
-            fuelGauge.setAlertThreshold((uint8_t)(TrackerLowBatteryCutoff - TrackerLowBatteryCutoffCorrection));
+            fuelGauge.setAlertThreshold((uint8_t)(_commonCfgData.lowBatteryCutoff - _commonCfgData.lowBatteryCutoffCorrection));
             fuelGauge.clearAlert();
             delay(100);
 
@@ -428,14 +403,14 @@ void Tracker::evaluateBatteryCharge() {
     // Debounce the charge status here by looking at data collected by the interrupt handler and making sure that the
     // last state is present over a qualified amount of time.
     auto status = getPendingChargeStatus();
-    if (status.uptime && ((System.uptime() - status.uptime) >= TrackerLowBatteryDebounceTime)) {
+    if (status.uptime && ((System.uptime() - status.uptime) >= _commonCfgData.lowBatteryDebounceTime)) {
         _chargeStatus = status.state;
         setPendingChargeStatus(0, _chargeStatus);
         _evalTick = System.uptime();
     }
 
     // No further work necessary if we are still in the delayed battery check interval or not on a evaluation interval
-    unsigned int evalLoopInterval = sleep.isSleepDisabled() ? TrackerLowBatteryAwakeEvalInterval : TrackerLowBatterySleepEvalInterval;
+    unsigned int evalLoopInterval = sleep.isSleepDisabled() ? _commonCfgData.lowBatteryAwakeEvalInterval : _commonCfgData.lowBatterySleepEvalInterval;
     if (_delayedBatteryCheck ||
         (System.uptime() - _evalTick < evalLoopInterval)) {
 
@@ -454,17 +429,17 @@ void Tracker::evaluateBatteryCharge() {
 
     switch (_chargeStatus) {
         case TrackerChargeState::CHARGE_CARE: {
-            if (_lowBatteryEvent || (stateOfCharge <= (float)TrackerLowBatteryCutoff)) {
+            if (_lowBatteryEvent || (stateOfCharge <= (float)_commonCfgData.lowBatteryCutoff)) {
                 // Publish then shutdown
-                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
+                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)_commonCfgData.lowBatteryCutoff);
                 startLowBatteryShippingMode();
             }
-            else if (!_pastWarnLimit && (stateOfCharge <= (float)TrackerLowBatteryWarning)) {
+            else if (!_pastWarnLimit && (stateOfCharge <= (float)_commonCfgData.lowBatteryWarning)) {
                 _pastWarnLimit = true;
                 // Publish once when falling through this value
                 Particle.publishVitals();
                 location.triggerLocPub(Trigger::IMMEDIATE,"batt_warn");
-                Log.warn("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Publishing warning", stateOfCharge, (float)TrackerLowBatteryWarning);
+                Log.warn("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Publishing warning", stateOfCharge, (float)_commonCfgData.lowBatteryWarning);
             }
             break;
         }
@@ -473,10 +448,10 @@ void Tracker::evaluateBatteryCharge() {
             // There may be instances where the device is being charged but the battery is still being discharged
             if (_lowBatteryEvent) {
                 // Publish then shutdown
-                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)TrackerLowBatteryCutoff);
+                Log.error("Battery charge of %0.1f%% is less than limit of %0.1f%%.  Entering shipping mode", stateOfCharge, (float)_commonCfgData.lowBatteryCutoff);
                 startLowBatteryShippingMode();
             }
-            else if (_pastWarnLimit && (stateOfCharge >= (float)(TrackerLowBatteryWarning + TrackerLowBatteryWarningHyst))) {
+            else if (_pastWarnLimit && (stateOfCharge >= (float)(_commonCfgData.lowBatteryWarning + _commonCfgData.lowBatteryWarningHyst))) {
                 _pastWarnLimit = false;
                 // Publish again to announce that we are out of low battery warning
                 Particle.publishVitals();
@@ -491,8 +466,8 @@ void Tracker::onSleepPrepare(TrackerSleepContext context)
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
         // Fall through
-        case TRACKER_MODEL_PROJECT_89503: {
-            TrackerSleep::instance().wakeAtSeconds(System.uptime() + TrackerLowBatterySleepWakeInterval);
+        case TRACKER_MODEL_MONITORONE: {
+            TrackerSleep::instance().wakeAtSeconds(System.uptime() + _commonCfgData.lowBatterySleepWakeInterval);
         }
         break;
     }
@@ -548,7 +523,7 @@ void Tracker::otaHandler(system_event_t event, int param) {
         case SystemEventsParam::firmware_update_failed: {
             if (!sleep.isSleepDisabled()) {
                 // Allow the device to go asleep after a chance for the cloud to restart a failed OTA
-                sleep.extendExecutionFromNow(TrackerFailedOtaKeepAwake);
+                sleep.extendExecutionFromNow(_commonCfgData.failedOtaKeepAwake);
                 sleep.resumeSleep();
             }
         }
@@ -606,12 +581,7 @@ int Tracker::init()
 #endif // TRACKER_MODEL_VARIANT
 #endif // TRACKER_MODEL_NUMBER
 
-    // Read OTP to determine configuration
-    auto status = EdgePlatform::instance().init();
-    if(status)
-    {
-        EdgePlatform::instance().readHwInfo();
-    }
+
 
     // Initialize unused interfaces and pins
     (void)initIo();
@@ -626,7 +596,6 @@ int Tracker::init()
 
         case TRACKER_MODEL_PROJECT_89503: {
             BLE.selectAntenna(BleAntennaType::EXTERNAL);
-            updatePmicChargeTimer(TrackerPmicChargeTimer::CHARGE_11_20_HOURS);
             initBatteryMonitor();
         }
         break;
@@ -719,11 +688,18 @@ int Tracker::init()
 
     location.regLocGenCallback(loc_gen_cb);
 
+    _platformConfig->load_specific_platform_config();
+    
     return SYSTEM_ERROR_NONE;
 }
 
 void Tracker::loop()
 {
+    if (_platformConfig == nullptr)
+    {
+        return;
+    }    
+
     uint32_t cur_sec = System.uptime();
 
     // slow operations for once a second
@@ -854,25 +830,25 @@ int Tracker::chargeCallback(TemperatureChargeEvent event) {
 
     switch (event) {
         case TemperatureChargeEvent::NORMAL: {
-            setChargeCurrent(TrackerChargeCurrentHigh);
+            setChargeCurrent(_commonCfgData.chargeCurrentHigh);
             shouldCharge = true;
             break;
         }
 
         case TemperatureChargeEvent::OVER_CHARGE_REDUCTION: {
-            setChargeCurrent(TrackerChargeCurrentLow);
+            setChargeCurrent(_commonCfgData.chargeCurrentLow);
             shouldCharge = true;
             break;
         }
 
         case TemperatureChargeEvent::OVER_TEMPERATURE: {
-            setChargeCurrent(TrackerChargeCurrentLow);
+            setChargeCurrent(_commonCfgData.chargeCurrentLow);
             shouldCharge = false;
             break;
         }
 
         case TemperatureChargeEvent::UNDER_TEMPERATURE: {
-            setChargeCurrent(TrackerChargeCurrentLow);
+            setChargeCurrent(_commonCfgData.chargeCurrentLow);
             shouldCharge = false;
             break;
         }
@@ -932,34 +908,4 @@ void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *con
         }
         break;
     }
-}
-
-
-void Tracker::updatePmicChargeTimer(TrackerPmicChargeTimer timer)
-{
-    uint8_t reg = CHARGE_TIMER_CONTROL_REGISTER,data = 0x00, readbackData = 0x00;
-    PMIC pmic(true);
-    data = pmic.readChargeTermRegister();
-    TrackerPmicChargeTimer defaultTimer = static_cast<TrackerPmicChargeTimer>((data >> 1) & 0x03);
-    //Log.info("%s: Read REG05 == 0x%02X, ChargeTimerType == %ld",__FUNCTION__,data,defaultTimer);
-    if (defaultTimer != timer)
-    {
-        data &= 0xF9;
-        data |= (static_cast<uint8_t>(timer) << 1) & 0x06;
-        WITH_LOCK(Wire1)
-        {
-            WireTransmission config(PMIC_ADDRESS);
-            config.timeout(10);
-            Wire1.beginTransmission(config);
-            Wire1.write(reg);
-            Wire1.write(data);
-            Wire1.endTransmission();                        
-        }
-        readbackData = pmic.readChargeTermRegister();
-    }
-    else
-    {
-        return;
-    }
-    //Log.info("%s: Write REG05 data == 0x%02X, readback == 0x%02X , ChargeTimerType == %ld",__FUNCTION__,data,readbackData,timer);
 }
