@@ -39,6 +39,7 @@
 #ifdef TRACKER_USE_MEMFAULT
 #include "memfault.h"
 #endif // TRACKER_USE_MEMFAULT
+#include "IEdgePlatformConfiguration.hpp"
 
 //
 // Default configuration
@@ -77,13 +78,6 @@ enum class TrackerChargeState {
     CHARGE_INIT,
     CHARGE_DONT_CARE,
     CHARGE_CARE,
-};
-
-enum class TrackerPmicChargeTimer {
-    CHARGE_00_05_HOURS = 0,         // 00 – 5  hrs
-    CHARGE_01_08_HOURS,             // 01 – 8  hrs
-    CHARGE_10_12_HOURS,             // 10 – 12 hrs
-    CHARGE_11_20_HOURS,             // 11 – 20 hrs
 };
 
 struct TrackerChargeStatus {
@@ -295,6 +289,19 @@ class Tracker {
         }
 
         /**
+         * @brief Initializate device with given configuration for application setup()
+         *
+         * @param config Configuration for general tracker operation
+         * @retval SYSTEM_ERROR_NONE
+         */
+        int init(IEdgePlatformConfiguration *pConfig) {
+            CHECK_TRUE((pConfig != nullptr), SYSTEM_ERROR_INVALID_ARGUMENT);
+            _platformConfig = pConfig;
+            _commonCfgData = _platformConfig->get_common_config_data();
+            return init();
+        }        
+
+        /**
          * @brief Perform device functionality for application loop()
          *
          */
@@ -445,6 +452,8 @@ class Tracker {
     #endif // TRACKER_USE_MEMFAULT
         TrackerCloudConfig _cloudConfig;
         TrackerConfiguration _deviceConfig;
+        IEdgePlatformConfiguration *_platformConfig {nullptr};
+        EdgePlatformCommonConfiguration _commonCfgData;
 
         uint32_t _model;
         uint32_t _variant;
@@ -502,8 +511,5 @@ class Tracker {
          * @param event Event class
          * @param data Particular event
          */
-        void otaHandler(system_event_t event, int data);
-
-        // Update PMIC Charge Timer
-        void updatePmicChargeTimer(TrackerPmicChargeTimer timer);        
+        void otaHandler(system_event_t event, int data);  
 };

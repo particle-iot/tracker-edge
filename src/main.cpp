@@ -15,7 +15,9 @@
  */
 
 #include "Particle.h"
-
+#include "EdgePlatform.h"
+#include "MonitorOneConfiguration.hpp"
+#include "TrackerOneConfiguration.hpp"
 #include "tracker_config.h"
 #include "tracker.h"
 
@@ -40,7 +42,24 @@ SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
 
 void setup()
 {
-    Tracker::instance().init();
+    //waitUntil(Serial.isConnected);
+
+    //delay(5000);
+    // Read OTP to determine configuration
+    auto status = EdgePlatform::instance().init();
+    if(status)
+    {
+        EdgePlatform::instance().readHwInfo();
+    }
+    switch (EdgePlatform::instance().getModel())
+    {
+    case TrackerModel::eMONITOR_ONE:
+        Tracker::instance().init(new MonitorOneConfiguration());
+        break;
+    default:
+        Tracker::instance().init(new TrackerOneConfiguration());
+        break;
+    }
 }
 
 void loop()
