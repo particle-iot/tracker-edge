@@ -17,7 +17,9 @@
 #pragma once
 
 #include "IEdgePlatformConfiguration.hpp"
-
+#include "tracker_config.h"
+#include "tracker_user_rgb.h"
+#include "Adp8866GnssLed.hpp"
 
 enum class TrackerPmicChargeTimer {
     CHARGE_00_05_HOURS = 0,         // 00 – 5  hrs
@@ -32,27 +34,17 @@ class MonitorOneConfiguration: public IEdgePlatformConfiguration
 public:
     MonitorOneConfiguration()
     {
-        commonCfg.canSleepRetries = 10; // Based on a series of 10ms delays
-        commonCfg.lowBatteryCutoff = 2; // percent of battery charge
-        commonCfg.lowBatteryCutoffCorrection = 1; // percent of battery charge
-        commonCfg.lowBatteryWarning = 8; // percent of battery charge
-        commonCfg.lowBatteryWarningHyst = 1; // percent of battery charge
-        commonCfg.lowBatteryAwakeEvalInterval = 2 * 60; // seconds to sample for low battery condition
-        commonCfg.lowBatterySleepEvalInterval = 1; // seconds to sample for low battery condition
-        commonCfg.lowBatterySleepWakeInterval = 15 * 60; // seconds to sample for low battery condition
-        commonCfg.postChargeSettleTime = 500; // milliseconds
-        commonCfg.lowBatteryStartTime = 20; // seconds to debounce low battery condition
-        commonCfg.lowBatteryDebounceTime = 5; // seconds to debounce low battery condition
-        commonCfg.chargingAwakeEvalTime = 10; // seconds to sample the PMIC charging state
-        commonCfg.chargingSleepEvalTime = 1; // seconds to sample the PMIC charging state
         commonCfg.chargeCurrentHigh = 1536; // milliamps
-        commonCfg.chargeCurrentLow = 512; // milliamps
         commonCfg.inputCurrent = 2048; // milliamps
-        commonCfg.failedOtaKeepAwake = 60; // seconds to stay awake after failed OTA
-        commonCfg.watchdogExpireTime = 60 * 1000; // milliseconds to expire the WDT
-        commonCfg.memfaultBatteryScaling = 10.0f; // scaling for battery SOC reporting
-        commonCfg.memfaultTemperatureScaling = 10.0f; // scaling for temperature reporting
-        commonCfg.memfaultTemperatureInvalid = -300.0f; // invalid temperature   
+
+        if(TrackerUserRGB::instance().init() == SYSTEM_ERROR_NONE)
+        {
+            TrackerUserRGB::instance().get_rgb2_instance().brightness(80);
+            TrackerUserRGB::instance().get_rgb2_instance().setPattern(LED_PATTERN_FADE);
+            TrackerUserRGB::instance().get_rgb2_instance().color(0,128,0);
+            TrackerUserRGB::instance().get_rgb2_instance().on();
+        }
+        commonCfg.pGnssLed = new Adp8866GnssLed(TrackerUserRGB::instance().get_rgb1_instance());
         Log.info("### %s ###",__FUNCTION__);
     }
 

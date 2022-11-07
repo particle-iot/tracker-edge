@@ -20,8 +20,6 @@
 #include "tracker_cellular.h"
 #include "mcp_can.h"
 #include "LocationPublish.h"
-#include "Adp8866GnssLed.hpp"
-#include "IoGnssLed.hpp"
 #include "tracker_fuelgauge.h"
 
 void ctrl_request_custom_handler(ctrl_request* req)
@@ -548,13 +546,6 @@ int Tracker::init()
 
     // Disable OTA updates until after the system handler has been registered
     System.disableUpdates();
-    if(TrackerUserRGB::instance().init() == SYSTEM_ERROR_NONE)
-    {
-        TrackerUserRGB::instance().get_rgb2_instance().brightness(80);
-        TrackerUserRGB::instance().get_rgb2_instance().setPattern(LED_PATTERN_FADE);
-        TrackerUserRGB::instance().get_rgb2_instance().color(0,128,0);
-        TrackerUserRGB::instance().get_rgb2_instance().on();
-    }
 
 #ifdef TRACKER_USE_MEMFAULT
     if (nullptr == _memfault) {
@@ -587,20 +578,9 @@ int Tracker::init()
     (void)initIo();
 
     // Perform IO setup specific to Tracker One.  Reset the fuel gauge state-of-charge, check if under thresholds.
-    switch (_model) {
-        case TRACKER_MODEL_TRACKERONE: {
-            BLE.selectAntenna(BleAntennaType::EXTERNAL);
-            initBatteryMonitor();
-        }
-        break;
-
-        case TRACKER_MODEL_PROJECT_89503: {
-            BLE.selectAntenna(BleAntennaType::EXTERNAL);
-            initBatteryMonitor();
-        }
-        break;
-    }
-
+    BLE.selectAntenna(BleAntennaType::EXTERNAL);
+    initBatteryMonitor();
+    
     // Setup device monitoring configuration here
     static ConfigObject deviceMonitoringDesc
     (
@@ -632,19 +612,16 @@ int Tracker::init()
     }
 
     // Check for Tracker One hardware
+    (void)GnssLedInit(_commonCfgData.pGnssLed);
+    GnssLedEnable(true);
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE: {
-            (void)GnssLedInit(new IoGnssLed(TRACKER_GNSS_LOCK_LED));
-            GnssLedEnable(true);
             temperature_init(TRACKER_THERMISTOR,
                 [this](TemperatureChargeEvent event){ return chargeCallback(event); }
             );
         }
         break;
-
-        case TRACKER_MODEL_PROJECT_89503: {
-            (void)GnssLedInit(new Adp8866GnssLed(TrackerUserRGB::instance().get_rgb1_instance()));
-            GnssLedEnable(true);            
+        case TRACKER_MODEL_MONITORONE: {        
             temperature_init(TRACKER_89503_THERMISTOR,
                 [this](TemperatureChargeEvent event){ return chargeCallback(event); }
             );

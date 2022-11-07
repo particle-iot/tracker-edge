@@ -31,7 +31,6 @@
 #include "tracker_location.h"
 #include "tracker_motion.h"
 #include "tracker_shipping.h"
-#include "tracker_user_rgb.h"
 #include "tracker_rgb.h"
 #include "gnss_led.h"
 #include "temperature.h"
