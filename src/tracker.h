@@ -35,7 +35,9 @@
 #include "gnss_led.h"
 #include "temperature.h"
 #include "mcp_can.h"
+#ifdef TRACKER_USE_MEMFAULT
 #include "memfault.h"
+#endif // TRACKER_USE_MEMFAULT
 
 //
 // Default configuration
@@ -430,7 +432,9 @@ class Tracker {
         int chargeCallback(TemperatureChargeEvent event);
 
         static Tracker* _instance;
+    #ifdef TRACKER_USE_MEMFAULT
         Memfault *_memfault {nullptr};
+    #endif // TRACKER_USE_MEMFAULT
         TrackerCloudConfig _cloudConfig;
         TrackerConfiguration _deviceConfig;
 

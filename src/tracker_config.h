@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "Particle.h"
+
 //-----------------------------------------------------------------------------
 // Tracker platform
 //-----------------------------------------------------------------------------
@@ -47,6 +49,9 @@
 #define TRACKER_PRODUCT_VERSION               (18)
 #endif
 
+#if (SYSTEM_VERSION < SYSTEM_VERSION_ALPHA(5, 0, 0, 1))
+#define TRACKER_USE_MEMFAULT
+#endif // SYSTEM_VERSION
 
 //
 // Pin and interface mapping
