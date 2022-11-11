@@ -475,7 +475,7 @@ void Tracker::onSleep(TrackerSleepContext context)
 {
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
-        case TRACKER_MODEL_PROJECT_89503: {
+        case TRACKER_MODEL_MONITORONE: {
             GnssLedEnable(false);
         }
         break;
@@ -486,7 +486,7 @@ void Tracker::onWake(TrackerSleepContext context)
 {
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
-        case TRACKER_MODEL_PROJECT_89503: {
+        case TRACKER_MODEL_MONITORONE: {
             GnssLedEnable(true);        
             // Ensure battery evaluation starts immediately after waking
             _evalTick = 0;
@@ -695,7 +695,7 @@ void Tracker::loop()
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
         // Fall through
-        case TRACKER_MODEL_PROJECT_89503:{
+        case TRACKER_MODEL_MONITORONE:{
             evaluateBatteryCharge();
         }
         break;
@@ -709,7 +709,7 @@ void Tracker::loop()
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
         // Fall through
-        case TRACKER_MODEL_PROJECT_89503: {
+        case TRACKER_MODEL_MONITORONE: {
             temperature_tick();
 
             if (temperature_high_events())
@@ -880,7 +880,7 @@ void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *con
     switch (Tracker::instance().getModel()) {
         case TRACKER_MODEL_TRACKERONE:
         // Fall through
-        case TRACKER_MODEL_PROJECT_89503: {
+        case TRACKER_MODEL_MONITORONE: {
             writer.name("temp").value(get_temperature(), 1);
         }
         break;
