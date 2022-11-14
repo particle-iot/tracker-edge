@@ -20,6 +20,7 @@
 #include "tracker_cellular.h"
 #include "mcp_can.h"
 #include "LocationPublish.h"
+#include "EdgePlatform.h"
 
 // Defines and constants
 constexpr int CanSleepRetries = 10; // Based on a series of 10ms delays
@@ -188,6 +189,7 @@ void Tracker::enableIoCanPower(bool enable)
 int Tracker::initEsp32()
 {
     // ESP32 related GPIO
+#if (PLATFORM_ID == PLATFORM_TRACKER)    
     pinMode(ESP32_BOOT_MODE_PIN, OUTPUT);
     digitalWrite(ESP32_BOOT_MODE_PIN, HIGH);
     pinMode(ESP32_PWR_EN_PIN, OUTPUT);
@@ -198,7 +200,7 @@ int Tracker::initEsp32()
     digitalWrite(ESP32_PWR_EN_PIN, LOW); // power off device
     pinMode(ESP32_CS_PIN, OUTPUT);
     digitalWrite(ESP32_CS_PIN, HIGH);
-
+#endif
     return SYSTEM_ERROR_NONE;
 }
 
@@ -572,6 +574,13 @@ int Tracker::init()
     _variant = 0;
 #endif // TRACKER_MODEL_VARIANT
 #endif // TRACKER_MODEL_NUMBER
+
+    // Read OTP to determine configuration
+    auto status = EdgePlatform::instance().init();
+    if(status)
+    {
+        EdgePlatform::instance().readHwInfo();
+    }
 
     // Initialize unused interfaces and pins
     (void)initIo();

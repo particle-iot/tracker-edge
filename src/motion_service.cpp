@@ -92,7 +92,7 @@ int MotionService::start(size_t eventDepth) {
     int ret = SYSTEM_ERROR_NONE;
 
     // Retrieve (if first time) instance of the BMI160 IMU device
-    ret = BMI160.begin(BMI160_SPI_INTERFACE, BMI160_SPI_CS_PIN, BMI160_INT_PIN);
+    ret = BMI160.begin(BMI_SPI_INTERFACE, BMI_SPI_CS_PIN, BMI_INT_PIN);
     if (ret != SYSTEM_ERROR_NONE) {
         Log.error("BMI160.begin() failed");
         return ret;

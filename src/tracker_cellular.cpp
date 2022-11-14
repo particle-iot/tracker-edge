@@ -16,6 +16,10 @@
 
 #include "tracker_cellular.h"
 
+#if (PLATFORM_ID == PLATFORM_TRACKERM)
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif    
+
 TrackerCellular *TrackerCellular::_instance = nullptr;
 
 TrackerCellular::TrackerCellular() : _signal_update(0), _thread(nullptr)

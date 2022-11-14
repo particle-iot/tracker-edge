@@ -36,11 +36,11 @@ static int set_motion_enabled_cb(int32_t value, const void *context)
     motion_service->enableMotionDetection((MotionDetectionMode) value);
     if ((MotionDetectionMode)value == MotionDetectionMode::NONE) {
         if (!motion_service->isAnyAwake()) {
-            TrackerSleep::instance().ignore((pin_t)BMI160_INT_PIN);
+            TrackerSleep::instance().ignore((pin_t)BMI_INT_PIN);
         }
     }
     else {
-        TrackerSleep::instance().wakeFor((pin_t)BMI160_INT_PIN, BMI160_INT_MODE);
+        TrackerSleep::instance().wakeFor((pin_t)BMI_INT_PIN, BMI_INT_MODE);
     }
     return 0;
 }
@@ -59,13 +59,13 @@ static int set_high_g_enabled_cb(int32_t value, const void *context)
     {
         motion_service->disableHighGDetection();
         if (!motion_service->isAnyAwake()) {
-            TrackerSleep::instance().ignore((pin_t)BMI160_INT_PIN);
+            TrackerSleep::instance().ignore((pin_t)BMI_INT_PIN);
         }
     }
     else if(value == (int32_t) HighGDetectionMode::ENABLE)
     {
         motion_service->enableHighGDetection();
-        TrackerSleep::instance().wakeFor((pin_t)BMI160_INT_PIN, BMI160_INT_MODE);
+        TrackerSleep::instance().wakeFor((pin_t)BMI_INT_PIN, BMI_INT_MODE);
     }
     else
     {
