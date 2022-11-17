@@ -34,6 +34,7 @@
 #define TRACKER_MODEL_EVAL                    (0x0001)
 #define TRACKER_MODEL_TRACKERONE              (0x0002)
 #define TRACKER_MODEL_MONITORONE              (0x0003)
+#define TRACKER_MODEL_TRACKERM                (0x0004)
 
 
 //
@@ -86,7 +87,7 @@
     #define QUECTEL_GNSS_PWR_EN_PIN           (GPS_PWR)
     #define QUECTEL_GNSS_WAKEUP_PIN           (GPS_RST)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define QUECTEL_GNSS_I2C_INTERFACE        (Wire1)
+    #define QUECTEL_GNSS_I2C_INTERFACE        (Wire)
     #define QUECTEL_GNSS_PWR_EN_PIN           (GNSS_PWR_EN)
     #define QUECTEL_GNSS_WAKEUP_PIN           (GNSS_RST)
 #endif    

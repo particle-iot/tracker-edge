@@ -77,6 +77,7 @@ bool EdgePlatform::init()
     modelTable_.insert({TRACKER_MODEL_EVAL,             TrackerModel::eEVAL});
     modelTable_.insert({TRACKER_MODEL_TRACKERONE,       TrackerModel::eTRACKER_ONE});
     modelTable_.insert({TRACKER_MODEL_MONITORONE,       TrackerModel::eMONITOR_ONE});
+    modelTable_.insert({TRACKER_MODEL_TRACKERM,         TrackerModel::eTRACKER_M});
 
     gnssTable_.insert({GNSS_NEO_M8U, GnssVariant::eNEO_M8U});
     gnssTable_.insert({GNSS_LC29HBA, GnssVariant::eLC29HBA});
@@ -165,6 +166,7 @@ bool EdgePlatform::readHwInfo()
     // Tracker-M is fixed with these peripherals
     (void)byte2;
     (void)byte3;
+    model_ = TrackerModel::eTRACKER_M;
     gnss_ = GnssVariant::eLC29HBA;
     imu_  = ImuVariant::eBMI270;
     fg_ = FuelGaugeType::eMAX17043;

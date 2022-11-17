@@ -17,7 +17,7 @@
 #include "Particle.h"
 #include "tracker_config.h"
 #include "motion_service.h"
-#include "bmi160.h"
+#include "tracker_imu.h"
 
 using namespace spark;
 using namespace particle;
@@ -25,41 +25,41 @@ using namespace particle;
 namespace {
 
 // TODO: This should probably be a constant expression
-Bmi160AccelerometerConfig bmi160AccelConfig = {
+BmiAccelerometerConfig bmiAccelConfig = {
     .rate               = 100.0,    // Hz [0.78Hz -> 1600Hz]
     .range              = 16.0,     // g [2g, 4g, 8g, 16g]
 };
 
-Bmi160AccelMotionConfig bmi160MotionConfigs[] = {
+BmiAccelMotionConfig bmiMotionConfigs[] = {
     // Low sensitivity motion detection settings
     {
-    .mode               = Bmi160AccelMotionMode::ACCEL_MOTION_MODE_SIGNIFICANT,
+    .mode               = BmiAccelMotionMode::ACCEL_MOTION_MODE_SIGNIFICANT,
     .motionThreshold    = 1,      // g [up to range]
     .motionDuration     = 4,        // counts of rate period [1 -> 4]
-    .motionSkip         = Bmi160AccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
-    .motionProof        = Bmi160AccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
+    .motionSkip         = BmiAccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
+    .motionProof        = BmiAccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
     },
 
     // Medium sensitivity motion detection settings
     {
-    .mode               = Bmi160AccelMotionMode::ACCEL_MOTION_MODE_ANY,
+    .mode               = BmiAccelMotionMode::ACCEL_MOTION_MODE_ANY,
     .motionThreshold    = 0.5,      // g [up to range]
     .motionDuration     = 4,        // counts of rate period [1 -> 4]
-    .motionSkip         = Bmi160AccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
-    .motionProof        = Bmi160AccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
+    .motionSkip         = BmiAccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
+    .motionProof        = BmiAccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
     },
 
     // High sensitivity motion detection settings
     {
-    .mode               = Bmi160AccelMotionMode::ACCEL_MOTION_MODE_ANY,
+    .mode               = BmiAccelMotionMode::ACCEL_MOTION_MODE_ANY,
     .motionThreshold    = 0.1,      // g [up to range]
     .motionDuration     = 1,        // counts of rate period [1 -> 4]
-    .motionSkip         = Bmi160AccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
-    .motionProof        = Bmi160AccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
+    .motionSkip         = BmiAccelSignificantMotionSkip::SIG_MOTION_SKIP_1_5_S,      // seconds [1.5s, 3s, 6s, 12s]
+    .motionProof        = BmiAccelSignificantMotionProof::SIG_MOTION_PROOF_0_25_S,   // seconds [0.25s, 0.5s, 1s, 2s]
     },
 };
 
-Bmi160AccelHighGConfig bmi160HighGConfig = {
+BmiAccelHighGConfig bmiHighGConfig = {
     .threshold          = 4.0,          // g [up to range]
     .duration           = 0.0025,       // seconds
     .hysteresis         = 16.0 / 16.0,  // g [up to range]
@@ -91,17 +91,19 @@ int MotionService::start(size_t eventDepth) {
 
     int ret = SYSTEM_ERROR_NONE;
 
-    // Retrieve (if first time) instance of the BMI160 IMU device
-    ret = BMI160.begin(BMI_SPI_INTERFACE, BMI_SPI_CS_PIN, BMI_INT_PIN);
+    auto imu = IMU.getImuType();
+
+    // Retrieve (if first time) instance of the BMI160/BMI270 IMU device
+    ret = IMU.begin(BMI_SPI_INTERFACE, BMI_SPI_CS_PIN, BMI_INT_PIN);
     if (ret != SYSTEM_ERROR_NONE) {
-        Log.error("BMI160.begin() failed");
+        Log.error("IMU.begin() failed");
         return ret;
     }
 
     // Clear all configuration to defaults
-    BMI160.reset();
+    IMU.reset();
     awakeFlags_ = MOTION_AWAKE_NONE;
-    CHECK(BMI160.initAccelerometer(bmi160AccelConfig));
+    CHECK(IMU.initAccelerometer(bmiAccelConfig));
 
     // Create the motion event queue if it hasn't been created yet
     eventDepth_ = eventDepth;
@@ -123,7 +125,7 @@ int MotionService::start(size_t eventDepth) {
 
 int MotionService::stop() {
     CHECK_TRUE(thread_, SYSTEM_ERROR_INVALID_STATE);
-    CHECK_FALSE(BMI160.syncEvent(Bmi160::Bmi160EventType::BREAK), SYSTEM_ERROR_UNKNOWN);
+    CHECK_FALSE(IMU.syncEvent(BmiEventType::BREAK), SYSTEM_ERROR_UNKNOWN);
     return SYSTEM_ERROR_NONE;
 }
 
@@ -145,28 +147,28 @@ int MotionService::enableMotionDetection(MotionDetectionMode mode) {
     // abstracted configuration modes: low, medium, and high.
     switch (mode) {
         case MotionDetectionMode::NONE: {
-            CHECK(BMI160.stopMotionDetect());
+            CHECK(IMU.stopMotionDetect());
             clearAwakeFlag(MOTION_AWAKE_SIGANY);
             if (!isAnyAwake()) {
-                CHECK(BMI160.sleep());
+                CHECK(IMU.sleep());
             }
             mode_ = mode;
             return SYSTEM_ERROR_NONE;
         }
 
         case MotionDetectionMode::LOW_SENSITIVITY: {
-            BMI160.initMotion(bmi160MotionConfigs[0], false);
+            IMU.initMotion(bmiMotionConfigs[0], false);
 
             break;
         }
 
         case MotionDetectionMode::MEDIUM_SENSITIVITY: {
-            BMI160.initMotion(bmi160MotionConfigs[1], false);
+            IMU.initMotion(bmiMotionConfigs[1], false);
             break;
         }
 
         case MotionDetectionMode::HIGH_SENSITIVITY: {
-            BMI160.initMotion(bmi160MotionConfigs[2], false);
+            IMU.initMotion(bmiMotionConfigs[2], false);
             break;
         }
 
@@ -176,10 +178,10 @@ int MotionService::enableMotionDetection(MotionDetectionMode mode) {
     }
 
     if (!isAnyAwake()) {
-        CHECK(BMI160.wakeup());
+        CHECK(IMU.wakeup());
     }
     setAwakeFlag(MOTION_AWAKE_SIGANY);
-    CHECK(BMI160.startMotionDetect());
+    CHECK(IMU.startMotionDetect());
 
     mode_ = mode;
 
@@ -196,22 +198,22 @@ MotionDetectionMode MotionService::getMotionDetection() {
 
 int MotionService::enableHighGDetection() {
     if (!isAnyAwake()) {
-        CHECK(BMI160.wakeup());
+        CHECK(IMU.wakeup());
     }
     setAwakeFlag(MOTION_AWAKE_HIGH_G);
-    BMI160.initHighG(bmi160HighGConfig, false);
-    CHECK(BMI160.startHighGDetect());
+    IMU.initHighG(bmiHighGConfig, false);
+    CHECK(IMU.startHighGDetect());
     highGMode_ = HighGDetectionMode::ENABLE;
 
     return SYSTEM_ERROR_NONE;
 }
 
 int MotionService::disableHighGDetection() {
-    CHECK(BMI160.stopHighGDetect());
+    CHECK(IMU.stopHighGDetect());
     highGMode_ = HighGDetectionMode::DISABLE;
     clearAwakeFlag(MOTION_AWAKE_HIGH_G);
     if (!isAnyAwake()) {
-        CHECK(BMI160.sleep());
+        CHECK(IMU.sleep());
     }
 
     return SYSTEM_ERROR_NONE;
@@ -242,14 +244,14 @@ void MotionService::thread(void* context) {
     // to die on its own using the BREAK event.
     bool exitLoop = false;
     while (!exitLoop) {
-        Bmi160::Bmi160EventType event;
-        BMI160.waitOnEvent(event, MotionService::MOTION_TIMEOUT_DEFAULT);
+        BmiEventType event;
+        IMU.waitOnEvent(event, MotionService::MOTION_TIMEOUT_DEFAULT);
         switch (event) {
 
             // This event may be a result of a timeout of the waitOnEvent() call if
             // a timeout value was given.  It can also be a mechanism to poke the service
             // to perform some kind of housekeeping.
-            case Bmi160::Bmi160EventType::NONE: {
+            case BmiEventType::NONE: {
                 self->counters_.noneEvents++;
                 break;
             }
@@ -258,17 +260,17 @@ void MotionService::thread(void* context) {
             // several interrupts supported on the device.
             // Capture the device event, inquire as to what caused the interrupt, and wrap this
             // extra information to the queue consumer.
-            case Bmi160::Bmi160EventType::SYNC: {
+            case BmiEventType::SYNC: {
                 self->counters_.syncEvents++;
                 uint32_t status = 0;
-                BMI160.getStatus(status, true);
+                IMU.getStatus(status, true);
 
-                if (BMI160.isHighGDetect(status)) {
+                if (IMU.isHighGDetect(status)) {
                     self->counters_.highGEvents++;
                     MotionEvent event = { .source = MotionSource::MOTION_HIGH_G };
                     os_queue_put(self->motionEventQueue_, &event, 0, nullptr);
                 }
-                if (BMI160.isMotionDetect(status)) {
+                if (IMU.isMotionDetect(status)) {
                     self->counters_.motionEvents++;
                     MotionEvent event = { .source = MotionSource::MOTION_MOVEMENT };
                     os_queue_put(self->motionEventQueue_, &event, 0, nullptr);
@@ -277,7 +279,7 @@ void MotionService::thread(void* context) {
             }
 
             // This is an explicit request to exit the thread
-            case Bmi160::Bmi160EventType::BREAK: {
+            case BmiEventType::BREAK: {
                 self->counters_.breakEvents++;
                 exitLoop = true;
                 break;
