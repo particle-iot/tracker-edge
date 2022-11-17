@@ -19,7 +19,17 @@
 #include "Particle.h"
 
 #include "ubloxGPS.h"
+#include "quecGNSS.h"
 
+/**
+ * @brief GPS module type
+ * 
+ */
+enum class GnssModuleType {
+    GNSS_NONE,
+    GNSS_UBLOX,
+    GNSS_QUECTEL,
+};
 
 /**
  * @brief Type of location point structure
@@ -501,6 +511,12 @@ public:
     }
 
     /**
+     * @brief Assign appropriate GNSS module used by this platform
+     *
+     */
+    void setModuleType(void);
+
+    /**
      * @brief Initialize the location service
      *
      * @retval SYSTEM_ERROR_NONE
@@ -622,9 +638,7 @@ public:
      * @retval TRUE if locked
      * @retval FALSE if not locked
      */
-    bool isLockStable() {
-        return gps_->isLockStable();
-    }
+    bool isLockStable();
 
     /**
      * @brief Indicate whether the GNSS module is active and sending NMEA/UBX data
@@ -632,9 +646,7 @@ public:
      * @return true Is active
      * @return false Is not active
      */
-    bool isActive() {
-        return gps_->is_active();
-    }; 
+    bool isActive();
 
 private:
 
@@ -681,9 +693,11 @@ private:
     RecursiveMutex pointMutex_;
     uint16_t selectPin_;
     uint16_t enablePin_;
-    ubloxGPS* gps_;
+    ubloxGPS* ubloxGps_;
+    quectelGPS* quecGps_;
     PointThreshold pointThreshold_;
     bool pointThresholdConfigured_;
     bool fastGnssLock_;
     bool enableHotStartOnWake_;
+    GnssModuleType gnssType_;
 };
