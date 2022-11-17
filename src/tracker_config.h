@@ -64,7 +64,7 @@
     #define BMI_INT_PIN                       (SEN_INT)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     #define BMI_SPI_INTERFACE                 (SPI)
-    #define BMI_SPI_CS_PIN                    (Y3) 
+    #define BMI_SPI_CS_PIN                    (Y3)
     #define BMI_INT_PIN                       (IO_EXP_B1)
 #endif
 #define BMI_INT_MODE                          (FALLING)
@@ -110,11 +110,11 @@
     #define MCP_CAN_STBY_PIN                  (CAN_STBY)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     #define MCP_CAN_SPI_INTERFACE             (SPI)
-    #define MCP_CAN_PWR_EN_PIN                (PIN_INVALID)
-    #define MCP_CAN_RESETN_PIN                (PIN_INVALID)
+    #define MCP_CAN_PWR_EN_PIN                (A0)
+    #define MCP_CAN_RESETN_PIN                (IO_EXP_B2)
     #define MCP_CAN_CS_PIN                    (Y4)
-    #define MCP_CAN_INT_PIN                   (IO_EXP_B3)
-    #define MCP_CAN_STBY_PIN                  (IO_EXP_B2)
+    #define MCP_CAN_INT_PIN                   (IO_EXP_B1)
+    #define MCP_CAN_STBY_PIN                  (IO_EXP_B3)
 #endif 
 
 
@@ -127,7 +127,7 @@
     #define TRACKER_GNSS_LOCK_LED             (D2)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     #define TRACKER_GNSS_LOCK_LED             (PIN_INVALID)
-#endif    
+#endif
 
 #if (PLATFORM_ID == PLATFORM_TRACKER)
     //#define RTC_WDT_DISABLE // Optional define for Tracker 
