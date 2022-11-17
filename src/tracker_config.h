@@ -58,13 +58,14 @@
 //
 // Pin and interface mapping
 //
-#define BMI_SPI_INTERFACE                     (SPI1)
 #if (PLATFORM_ID == PLATFORM_TRACKER)
+    #define BMI_SPI_INTERFACE                 (SPI1)
     #define BMI_SPI_CS_PIN                    (SEN_CS)
     #define BMI_INT_PIN                       (SEN_INT)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define BMI_SPI_CS_PIN                    (SENSOR_CS) 
-    #define BMI_INT_PIN                       (SENSOR_INT1)
+    #define BMI_SPI_INTERFACE                 (SPI)
+    #define BMI_SPI_CS_PIN                    (Y3) 
+    #define BMI_INT_PIN                       (IO_EXP_B1)
 #endif
 #define BMI_INT_MODE                          (FALLING)
 
@@ -75,10 +76,10 @@
     #define UBLOX_RESETN_PIN                  (GPS_RST)
     #define UBLOX_TX_READY_MCU_PIN            (GPS_INT)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM) 
-    #define UBLOX_CS_PIN                      (0)
+    #define UBLOX_CS_PIN                      (PIN_INVALID)
     #define UBLOX_PWR_EN_PIN                  (GNSS_PWR_EN)
     #define UBLOX_RESETN_PIN                  (GNSS_RST)
-    #define UBLOX_TX_READY_MCU_PIN            (0)
+    #define UBLOX_TX_READY_MCU_PIN            (PIN_INVALID)
 #endif    
 #define UBLOX_TX_READY_GPS_PIN                (14) // PIO 14 is EXTINT on GPS Module
 
@@ -100,17 +101,21 @@
     #define ESP32_INT_PIN                     (WIFI_INT)   
 #endif
 
-#define MCP_CAN_SPI_INTERFACE                 (SPI1)
-#define MCP_CAN_CS_PIN                        (CAN_CS)
-#define MCP_CAN_STBY_PIN                      (CAN_STBY)
 #if (PLATFORM_ID == PLATFORM_TRACKER)
+    #define MCP_CAN_SPI_INTERFACE             (SPI1)
     #define MCP_CAN_PWR_EN_PIN                (CAN_PWR)
     #define MCP_CAN_RESETN_PIN                (CAN_RST)
+    #define MCP_CAN_CS_PIN                    (CAN_CS)
+    #define MCP_CAN_INT_PIN                   (CAN_INT)
+    #define MCP_CAN_STBY_PIN                  (CAN_STBY)
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define MCP_CAN_PWR_EN_PIN                (CAN_VDD_EN)
+    #define MCP_CAN_SPI_INTERFACE             (SPI)
+    #define MCP_CAN_PWR_EN_PIN                (PIN_INVALID)
     #define MCP_CAN_RESETN_PIN                (PIN_INVALID)
+    #define MCP_CAN_CS_PIN                    (Y4)
+    #define MCP_CAN_INT_PIN                   (IO_EXP_B3)
+    #define MCP_CAN_STBY_PIN                  (IO_EXP_B2)
 #endif 
-#define MCP_CAN_INT_PIN                       (CAN_INT)
 
 
 //
