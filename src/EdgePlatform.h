@@ -30,6 +30,7 @@ enum class TrackerModel
     eEVAL,
     eTRACKER_ONE,
     eMONITOR_ONE,
+    eTRACKER_M,
     eMODEL_INVALID
 }; 
 
