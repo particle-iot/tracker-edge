@@ -123,7 +123,11 @@
 //
 #define TRACKER_THERMISTOR                    (A0)
 #define TRACKER_USER_BUTTON                   (D1)
-#define TRACKER_GNSS_LOCK_LED                 (D2)
+#if (PLATFORM_ID == PLATFORM_TRACKER)
+    #define TRACKER_GNSS_LOCK_LED             (D2)
+#elif (PLATFORM_ID == PLATFORM_TRACKERM)
+    #define TRACKER_GNSS_LOCK_LED             (PIN_INVALID)
+#endif    
 
 #if (PLATFORM_ID == PLATFORM_TRACKER)
     //#define RTC_WDT_DISABLE // Optional define for Tracker 
