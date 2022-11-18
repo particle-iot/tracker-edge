@@ -96,12 +96,7 @@ int LocationService::begin(const LocationServiceConfiguration& config) {
     }
     else
     {
-        CHECK_FALSE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
-
-#if (PLATFORM_ID == PLATFORM_TRACKERM)
-        pinMode(IO_2V8_EN, OUTPUT);
-        digitalWrite(IO_2V8_EN, HIGH);
-#endif        
+        CHECK_FALSE(quecGps_, SYSTEM_ERROR_INVALID_STATE);       
 
         do {
             quecGps_ = new quectelGPS(QUECTEL_GNSS_I2C_INTERFACE, QUECTEL_GNSS_PWR_EN_PIN,

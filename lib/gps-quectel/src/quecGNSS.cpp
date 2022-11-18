@@ -240,6 +240,11 @@ void quectelGPS::processLockStability()
 /************** PUBLIC METHODS ****************************/
 Dev_Resp_FlagStatus quectelGPS::quectelDevInit(void)
 {
+#if (PLATFORM_ID == PLATFORM_TRACKERM)
+    pinMode(IO_2V8_EN, OUTPUT);
+    digitalWrite(IO_2V8_EN, HIGH);
+#endif 
+
     // Configure the module power enable
 	pinMode(_powerPin, OUTPUT);
     pinMode(_wakeupPin, OUTPUT);
