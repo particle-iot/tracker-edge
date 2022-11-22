@@ -107,7 +107,11 @@ I2c_Resp_FlagStatus quectelGNSSCoreI2C::i2cMasterReceive(uint8_t addr, uint8_t* 
     WITH_LOCK(_i2c) // Other devices are on this bus using this same global handle
     {
         // Read the requested amount of data from the specified address
-        _i2c.requestFrom(addr, reqLen);
+        size_t requestedBytes = _i2c.requestFrom(addr, reqLen);
+        if (requestedBytes != reqLen) {
+            // The request for data from the slave was NAK'd
+            return I2C_NACK;
+        }
 
         size_t nread = _i2c.readBytes((char*)pBuff, reqLen);
         if (nread != reqLen) {
