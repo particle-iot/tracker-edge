@@ -18,6 +18,7 @@
 #include "EdgePlatform.h"
 #include "MonitorOneConfiguration.hpp"
 #include "TrackerOneConfiguration.hpp"
+#include "TrackerMConfiguration.h"
 #include "tracker_config.h"
 #include "tracker.h"
 
@@ -56,8 +57,11 @@ void setup()
     case TrackerModel::eMONITOR_ONE:
         Tracker::instance().init(new MonitorOneConfiguration());
         break;
-    default:
+    case TrackerModel::eTRACKER_ONE:
         Tracker::instance().init(new TrackerOneConfiguration());
+        break;
+    case TrackerModel::eTRACKER_M:
+        Tracker::instance().init(new TrackerMConfiguration());
         break;
     }
 }
