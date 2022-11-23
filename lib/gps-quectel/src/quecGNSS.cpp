@@ -146,11 +146,11 @@ void quectelGPS::sendCommand(const char* cmd, uint32_t len)
                 else {
                     // This retry works around a problem where the LC29H reports a receive
                     // buffer available size that doesn't reflect its actual data consumption. 
-                    qgnss_local_log.trace("xmit continue: %u / %u", total_sent, len);
+                    qgnss_local_log.trace("xmit continue: %u / %lu", total_sent, len);
                 }
             }
             else {
-                qgnss_local_log.warn("sendCommand rc: %d after: %u ok", (int)rc, num_valid_sends);
+                qgnss_local_log.warn("sendCommand rc: %d after: %lu ok", (int)rc, num_valid_sends);
                 num_valid_sends = 0;
                 delay(1);
                 retry_count++;
@@ -265,7 +265,7 @@ Dev_Resp_FlagStatus quectelGPS::quectelDevInit(void)
     // Flag the device as ready for commands
     _initialized = true;
     _initializing = true;
-    _enableDiag = true;
+    _enableDiag = false;
     _gpsStatus = gpsLedStatus::GPS_STATUS_FIXING;
  
     // After startup of the module, it will be unresponsive
