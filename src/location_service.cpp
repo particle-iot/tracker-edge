@@ -216,7 +216,6 @@ int LocationService::start(bool restart) {
         CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
 
         // Unconditionally turn on the GNSS module and start polling for GPS data
-        Log.info("GNSS Start");
         quecGps_->quectelModulePower(true);
         quecGps_->quectelStart();
     }

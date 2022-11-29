@@ -175,7 +175,6 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevReceive(uint8_t* pData, size_t ma
     //step 1_a
     request_cmd[0] = (uint32_t)((uint32_t)(QUECTEL_I2C_SLAVE_CR_CMD << 16) | QUECTEL_I2C_SLAVE_TX_LEN_REG_OFFSET);
     request_cmd[1] = 4; 
-    i2c_master_receive_error_counter = 0;
 
     while(true) {
         delayMicroseconds(QUECTEL_TRANSACTION_DELAY_US);
@@ -184,20 +183,16 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevReceive(uint8_t* pData, size_t ma
             break;
         }
         else {
-            Log.warn("devReceive init cmd failed");
+            Log.warn("Configure read cmd failed");
             return QuecDriverStatus::QDEV_ERROR;
         }
     }
 
     //step 1_b
-    i2c_master_receive_error_counter = 0;
     while(true)  {
         delayMicroseconds(QUECTEL_TRANSACTION_DELAY_US);
         status = i2cMasterReceive(QUECTEL_I2C_SLAVE_ADDRESS_R, (uint8_t*)&avail_len, QUECTEL_I2C_CMD_RESP_LEN, &received_len);
         if ((status == I2C_ACK) && (received_len == QUECTEL_I2C_CMD_RESP_LEN))  {
-            if (0 == avail_len) {
-                return QuecDriverStatus::QDEV_ERROR;
-            }
             if (avail_len > prev_avail_max) {
                 i2c_local_log.trace("qavail: %u prev_avail_max: %u", avail_len, prev_avail_max);
                 prev_avail_max = avail_len;
@@ -206,23 +201,25 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevReceive(uint8_t* pData, size_t ma
         }
         else {
             // don't bother to retry because it consistently fails
-            Log.warn("devReceive query avail buf failed");
+            Log.warn("Read available bytes failed");
             return QuecDriverStatus::QDEV_ERROR;
         }
     }
 
     if (avail_len == 0) {
-        return QuecDriverStatus::QDEV_ERROR;
+        // Having zero bytes of data available to read is a valid response
+        return QuecDriverStatus::QDEV_SUCCESS;
     }
+
     nreq = avail_len;
     if (nreq > maxLength) {
+        //Log.warn("Available bytes %d larger than buffer size %d", nreq, maxLength);
         nreq = maxLength;
     }
 
     //step 2_a
     request_cmd[0] = (uint32_t)(QUECTEL_I2C_SLAVE_CR_CMD << 16) | QUECTEL_I2C_SLAVE_TX_BUF_REG_OFFSET;
     request_cmd[1] = nreq;
-    i2c_master_receive_error_counter = 0;
     while (true) {
         delayMicroseconds(QUECTEL_TRANSACTION_DELAY_US);
         status = i2cMasterTransmit(QUECTEL_I2C_SLAVE_ADDRESS_CR_OR_CW, (uint8_t *)request_cmd, QUECTEL_I2C_SLAVE_CMD_LEN);
@@ -230,13 +227,12 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevReceive(uint8_t* pData, size_t ma
             break;
         }
         else {
-            Log.warn("devReceive query cmd failed");
+            Log.warn("Read bytes command failed");
             return QuecDriverStatus::QDEV_ERROR;
         }
     }
 
     //step 2_b
-    i2c_master_receive_error_counter = 0;
     while(true)  {
         delayMicroseconds(QUECTEL_TRANSACTION_DELAY_US);
         status = i2cMasterReceive(QUECTEL_I2C_SLAVE_ADDRESS_R, pData, nreq, &received_len);
@@ -245,7 +241,7 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevReceive(uint8_t* pData, size_t ma
             //i2c_local_log.info("avail: %u max: %u nreq: %u nrecv: %u", avail_len, maxLength, nreq, received_len);
             return QuecDriverStatus::QDEV_SUCCESS;
         }
-        Log.warn("devReceive read failed");
+        Log.warn("Read bytes failed");
         i2c_master_receive_error_counter++;
         if(i2c_master_receive_error_counter > MAX_ERROR_NUMBER)  {
             return QuecDriverStatus::QDEV_ERROR;
@@ -272,7 +268,6 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevTransmit(const uint8_t *pData, si
     //step 1_a
     request_cmd[0] = (uint32_t)((QUECTEL_I2C_SLAVE_CR_CMD << 16) | QUECTEL_I2C_SLAVE_RX_LEN_REG_OFFSET);
     request_cmd[1] = 4; 
-    i2c_master_receive_error_counter = 0;
 
     while(true) {
         delayMicroseconds(QUECTEL_TRANSACTION_DELAY_US);
@@ -288,7 +283,6 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevTransmit(const uint8_t *pData, si
     }
 
     //step 1_b
-    i2c_master_receive_error_counter = 0;
     while(true)  {
         delayMicroseconds(QUECTEL_TRANSACTION_DELAY_US);
         status = i2cMasterReceive(QUECTEL_I2C_SLAVE_ADDRESS_R, (uint8_t*)&rxBuffLength, QUECTEL_I2C_CMD_RESP_LEN, &received_len);
@@ -344,7 +338,7 @@ QuecDriverStatus quectelGNSSCoreI2C::quectelDevTransmit(const uint8_t *pData, si
                 //i2c_local_log.trace("wrapping total_sent!");
                 total_sent = 0;
             }
-            return QuecDriverStatus::QDEV_SUCCESS;
+            break;
         }
         i2c_master_receive_error_counter++;
         if(i2c_master_receive_error_counter > MAX_ERROR_NUMBER) {

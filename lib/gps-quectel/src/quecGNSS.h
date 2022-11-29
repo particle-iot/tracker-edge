@@ -93,7 +93,7 @@ public:
      *
      * @param none 
      */
-    Dev_Resp_FlagStatus quectelDevInit();
+    Dev_Resp_FlagStatus quectelDevInit(bool reInit = false);
 
     /**
      * @brief Start data collection
