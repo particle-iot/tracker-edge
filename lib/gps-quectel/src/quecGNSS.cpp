@@ -4,7 +4,8 @@
 
 /************** DEFINES ****************************/
 
-#define QUECTEL_CMD_WAIT_US                 10000
+#define QUECTEL_CMD_WAIT_US                 (10000)
+#define QUECTEL_RESET_WAIT_US               (1000000)
 #define QUECTEL_STARTUP_WAIT_US             (QUECTEL_CMD_WAIT_US * 500)
 
 #define LOG_DEVICE                          (Serial1)
@@ -17,7 +18,6 @@ static RecursiveMutex gps_mutex;
 Logger qgnss_local_log("qgnss");
 
 
-
 /************** CONSTANTS ************************/
 static constexpr uint8_t  NMEA_START_DELIMITER         = '$';
 static constexpr uint8_t  NMEA_END_CHAR_1              = '\n';
@@ -28,6 +28,8 @@ static constexpr uint32_t MAX_GPS_ACTIVE_TIME_MS       = 5000;
 
 static constexpr double   STABILITY_HDOP_THRESHOLD     = 20.0;
 
+static constexpr uint32_t MAX_GPS_READ_FAILURE_SOFT_RESET = 5;
+static constexpr uint32_t MAX_GPS_READ_FAILURE_HARD_RESET = 10;
 
 /************** MACROS ***************************/
 /**
@@ -68,10 +70,9 @@ static void nmeaDisplay(gps_t* gh, gps_statement_t res)
 {
     if(res != STAT_CHECKSUM_FAIL)
     {
-        LOG_DEVICE.printf("%.*s\r\n", gh->sentence_len, gh->sentence);
+        Log.trace("%.*s", gh->sentence_len, gh->sentence);
     }
 }
-
 
 
 /************** CONSTRUCTOR ***********************/
@@ -94,8 +95,6 @@ quectelGPS::quectelGPS(TwoWire& bus, uint16_t powerPin, uint16_t wakeupPin) :
     _initialized = false;
     _running = false;
 }
-
-
 
 
 uint8_t quectelGPS::calculateChecksum(uint8_t *pData)
@@ -136,9 +135,9 @@ void quectelGPS::sendCommand(const char* cmd, uint32_t len)
             LOCK();
 
             auto rc = _i2cDriver->quectelDevTransmit((uint8_t *)(cmd+total_sent), (len-total_sent), &incr_sent);
+            delayMicroseconds(QUECTEL_CMD_WAIT_US);
             if (QuecDriverStatus::QDEV_SUCCESS  == rc) {
                 total_sent += incr_sent;
-                delayMicroseconds(QUECTEL_CMD_WAIT_US);
                 if (total_sent >= len) {
                     num_valid_sends += 1;
                     break;
@@ -168,20 +167,39 @@ void quectelGPS::updateGPS(void)
             while (true)  {
                 // only lock ownership with the gnss receiver for the minimum time required
                 LOCK();
+
+                static int readFailures = 0;
                 size_t bytesReceived = 0;
                 memset(_msgBuf, 0, sizeof(_msgBuf));
                 auto rc = _i2cDriver->quectelDevReceive(_msgBuf, sizeof(_msgBuf), &bytesReceived);
 
                 // Display results
-                if (( QuecDriverStatus::QDEV_SUCCESS == rc) && (bytesReceived > 0))  {
-                    // qgnss_local_log.info("processing: %u", bytesReceived);
-                    processGpsBytes(_msgBuf, bytesReceived);
-                }
-                else {
-                    break;
+                if (QuecDriverStatus::QDEV_SUCCESS == rc) {
+                    readFailures = 0;
+                    if (bytesReceived > 0) {
+                        // qgnss_local_log.info("processing: %u", bytesReceived);
+                        processGpsBytes(_msgBuf, bytesReceived);
+                    } else {
+                        // No data to read from module
+                        break;
+                    }
+                } else if (QuecDriverStatus::QDEV_ERROR == rc) {
+                    readFailures++;
+                    if (readFailures == MAX_GPS_READ_FAILURE_HARD_RESET) {
+                        Log.warn("Failed to read NMEA data %d times, hard resetting", readFailures);
+                        // Power cycle module
+                        digitalWrite(_powerPin, LOW);
+                        delayMicroseconds(QUECTEL_RESET_WAIT_US);
+                        digitalWrite(_powerPin, HIGH);
+                        quectelDevInit(true);
+                        readFailures = 0;
+                    } else if (readFailures == MAX_GPS_READ_FAILURE_SOFT_RESET) {
+                        Log.warn("Failed to read NMEA data %d times, soft resetting", readFailures);
+                        quectelResetGnss();
+                        quectelDevInit(true);
+                    }
                 }
             }
-
             _msgDone = false;
         }
 
@@ -238,7 +256,7 @@ void quectelGPS::processLockStability()
 
 
 /************** PUBLIC METHODS ****************************/
-Dev_Resp_FlagStatus quectelGPS::quectelDevInit(void)
+Dev_Resp_FlagStatus quectelGPS::quectelDevInit(bool reInit)
 {
 #if (PLATFORM_ID == PLATFORM_TRACKERM)
     pinMode(IO_2V8_EN, OUTPUT);
@@ -285,55 +303,47 @@ Dev_Resp_FlagStatus quectelGPS::quectelDevInit(void)
         }
     }
 
-
     // Start the data collection thread
-    _gpsThread = new Thread("gps", [this]() { updateGPS(); }, OS_THREAD_PRIORITY_DEFAULT);
-
+    if (!reInit) {
+        _gpsThread = new Thread("gps", [this]() { updateGPS(); }, OS_THREAD_PRIORITY_DEFAULT);
+    }
+    
     _initializing = false;
 
     // Enable proprietary message reporting
     const char *cmd1 = "$PAIR6010,-1,1*20\r\n";  //set defaults
     sendCommand( cmd1, strlen(cmd1));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Enable vehicle message reporting
     const char *cmd2 = "$PAIR6010,0,1*0C\r\n"; //open PQTMVEHMSG
     sendCommand( cmd2, strlen(cmd2));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Enable sensor message reporting
     const char *cmd3 = "$PAIR6010,1,1*0D\r\n"; //open PQTMSENMSG
     sendCommand( cmd3, strlen(cmd3));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Enable calibration state reporting
     const char *cmd4 = "$PAIR6010,2,1*0E\r\n"; //open PQTMDRCAL
     sendCommand( cmd4, strlen(cmd4));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Enable IMU reporting
     const char *cmd5 = "$PAIR6010,3,1*0F\r\n"; //open PQTMIMUTYPE
     sendCommand( cmd5, strlen(cmd5));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Enable motion reporting
     const char *cmd6 = "$PAIR6010,4,1*08\r\n"; //open PQTMVEHMOT
     sendCommand( cmd6, strlen(cmd6));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Enable estimated error reporting
     const char *cmd7 = "$PAIR6010,5,1*09\r\n"; //open PQTMEPE
     sendCommand( cmd7, strlen(cmd7));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     const char *cmd8 = "$PQTMCFGMSGRATE,W,PQTMEPE,1,2*1D\r\n"; //open PQTMEPE (2WD)
     sendCommand( cmd8, strlen(cmd8));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Save the settings to NVRAM
     const char *cmd9 = "$PQTMSAVEPAR*5A\r\n"; //save to nvram
     sendCommand( cmd9, strlen(cmd9));
-    delayMicroseconds(QUECTEL_CMD_WAIT_US);
 
     // Set the NMEA types to stream
     quectelSetFilters( NMEA_SEN_ALL );
