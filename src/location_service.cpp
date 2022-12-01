@@ -45,7 +45,7 @@ LocationService::LocationService()
 void LocationService::setModuleType(void)
 {
     // Parse OTP 'features' area to determine module type
-    if(GnssVariant::eLC29HBA == EdgePlatform::instance().getGnss())
+    if(EdgePlatform::GnssVariant::eLC29HBA == EdgePlatform::instance().getGnss())
     {
         gnssType_ = GnssModuleType::GNSS_QUECTEL;
     }
