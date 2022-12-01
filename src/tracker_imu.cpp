@@ -49,10 +49,10 @@ BmiVariant TrackerImu::getImuType(void)
     // Set the IMU type
     switch(imu)
     {
-        case ImuVariant::eBMI160:
+        case EdgePlatform::ImuVariant::eBMI160:
             imu_ = BmiVariant::IMU_BMI160;
             break;
-        case ImuVariant::eBMI270:
+        case EdgePlatform::ImuVariant::eBMI270:
             imu_ = BmiVariant::IMU_BMI270;
             break;
         default:

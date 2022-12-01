@@ -54,13 +54,13 @@ void setup()
     }
     switch (EdgePlatform::instance().getModel())
     {
-    case TrackerModel::eMONITOR_ONE:
+    case EdgePlatform::TrackerModel::eMONITOR_ONE:
         Tracker::instance().init(new MonitorOneConfiguration());
         break;
-    case TrackerModel::eTRACKER_ONE:
+    case EdgePlatform::TrackerModel::eTRACKER_ONE:
         Tracker::instance().init(new TrackerOneConfiguration());
         break;
-    case TrackerModel::eTRACKER_M:
+    case EdgePlatform::TrackerModel::eTRACKER_M:
         Tracker::instance().init(new TrackerMConfiguration());
         break;
     }

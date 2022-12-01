@@ -131,11 +131,11 @@ bool EdgePlatform::readHwInfo()
     // +----+----+----+----+----+----+----+----+
 
     // Only one type of CAN interface has been defined
-    canIface_ = CanXcvr::eMCP25625;
+    canIface_ = EdgePlatform::CanXcvr::eMCP25625;
 
     if( GPIO_MCP23S17 == ((byte2 & GPIO_MASK) >> GPIO_SHIFT) )
     {
-        gpioExpander_ = GpioExpander::eMCP23S17;
+        gpioExpander_ = EdgePlatform::GpioExpander::eMCP23S17;
     }
 
     imu_  = imuTable_[(byte2 & IMU_MASK)>>IMU_SHIFT];
@@ -151,7 +151,7 @@ bool EdgePlatform::readHwInfo()
     // +----+----+----+----+----+----+----+----+
 
     // Only one type of fuel gauge has been defined
-    fg_ = FuelGaugeType::eMAX17043;
+    fg_ = EdgePlatform::FuelGaugeType::eMAX17043;
 
     wifi_ = wifiTable_[(byte3 & WIFI_MASK) >> WIFI_SHIFT];
 
@@ -161,85 +161,85 @@ bool EdgePlatform::readHwInfo()
 
     // Sensirion sensor type is currently not a field in OTP.
     // However, there may be a field in the future.
-    sensirion_ = SensirionType::eSTS31;
+    sensirion_ = EdgePlatform::SensirionType::eSTS31;
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     // Tracker-M is fixed with these peripherals
     (void)byte2;
     (void)byte3;
-    model_ = TrackerModel::eTRACKER_M;
-    gnss_ = GnssVariant::eLC29HBA;
-    imu_  = ImuVariant::eBMI270;
-    fg_ = FuelGaugeType::eMAX17043;
-    sensirion_ = SensirionType::eSTS31;
+    model_ = EdgePlatform::TrackerModel::eTRACKER_M;
+    gnss_ = EdgePlatform::GnssVariant::eLC29HBA;
+    imu_  = EdgePlatform::ImuVariant::eBMI270;
+    fg_ = EdgePlatform::FuelGaugeType::eMAX17043;
+    sensirion_ = EdgePlatform::SensirionType::eSTS31;
 #endif
 
     return true;
 }
 
-TrackerModel EdgePlatform::getModel() const
+EdgePlatform::TrackerModel EdgePlatform::getModel() const
 {
     CHECK_TRUE(isInitialized_, TrackerModel::eMODEL_INVALID);
 
     return model_;
 }
 
-GnssVariant EdgePlatform::getGnss() const
+EdgePlatform::GnssVariant EdgePlatform::getGnss() const
 {
     CHECK_TRUE(isInitialized_, GnssVariant::eGNSS_INVALID);
 
     return gnss_;
 }
 
-ImuVariant EdgePlatform::getImu() const
+EdgePlatform::ImuVariant EdgePlatform::getImu() const
 {
     CHECK_TRUE(isInitialized_, ImuVariant::eIMU_INVALID);
 
     return imu_;
 }
 
-GpioExpander EdgePlatform::getGpioExpander() const
+EdgePlatform::GpioExpander EdgePlatform::getGpioExpander() const
 {
     CHECK_TRUE(isInitialized_, GpioExpander::eEXPANDER_INVALID);
 
     return gpioExpander_;
 }
 
-CanXcvr EdgePlatform::getCanInterface() const
+EdgePlatform::CanXcvr EdgePlatform::getCanInterface() const
 {
     CHECK_TRUE(isInitialized_, CanXcvr::eCAN_INVALID);
 
     return canIface_;
 }
 
-Ilim EdgePlatform::getCurrentLimit() const
+EdgePlatform::Ilim EdgePlatform::getCurrentLimit() const
 {
     CHECK_TRUE(isInitialized_, Ilim::eILIM_INVALID);
 
     return currentLimit_;
 }
 
-ThermistorType EdgePlatform::getThermistor() const
+EdgePlatform::ThermistorType EdgePlatform::getThermistor() const
 {
     CHECK_TRUE(isInitialized_, ThermistorType::eTR_INVALID);
 
     return tr_;
 }
 
-WiFiVariant EdgePlatform::getWifiType() const
+EdgePlatform::WiFiVariant EdgePlatform::getWifiType() const
 {
     CHECK_TRUE(isInitialized_, WiFiVariant::eWIFI_INVALID);
 
     return wifi_;
 }
 
-FuelGaugeType EdgePlatform::getFuelGaugeType() const
+EdgePlatform::FuelGaugeType EdgePlatform::getFuelGaugeType() const
 {
     CHECK_TRUE(isInitialized_, FuelGaugeType::eFG_INVALID);
 
     return fg_;
 }
 
-SensirionType EdgePlatform::getSensirionType() const
+EdgePlatform::SensirionType EdgePlatform::getSensirionType() const
 {
     CHECK_TRUE(isInitialized_, SensirionType::eSENSE_INVALID);
 
