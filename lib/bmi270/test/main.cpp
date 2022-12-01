@@ -17,11 +17,17 @@
 #include "Particle.h"
 #include "imu_bmi270.h"
 
+#if (PLATFORM_ID == PLATFORM_TRACKER)
+    #define SPI_XFACE                   (SPI1)
+    #define SPI_CS_PIN                  (SEN_CS)
 
-#define SPI_XFACE                   (SPI1)
-#define SPI_CS_PIN                  (SEN_CS)
+    #define INT_PIN                     (SEN_INT)
+#elif (PLATFORM_ID == PLATFORM_TRACKERM)
+    #define SPI_XFACE                   (SPI)
+    #define SPI_CS_PIN                  (Y3)
 
-#define INT_PIN                     (SEN_INT)
+    #define INT_PIN                     (IO_EXP_B1)
+#endif    
 
 /*
 LOG_LEVEL_ALL   : special value that can be used to enable logging of all messages
@@ -58,7 +64,7 @@ Bmi270AccelHighGConfig configHighG = {
     .hysteresis         = 16.0 / 16.0, // g [up to range]
 };
 
-static int WAKEUP_TIME = 60; // seconds
+static int WAKEUP_TIME = 60 * 1000; // milliseconds
 static int MOTION_TIMOUT = 60 * 1000; // milliseconds
 static bool SLEEP_ENABLED = true;
 static unsigned long UPDATE_DELAY = 10; // milliseconds
@@ -146,10 +152,16 @@ void loop() {
     else {
         BMI270.getStatus(val, false);
     }
-    // Serial1.printf("%2.3f,%2.3f,%2.3f,%u,%u,%u,%08lx\r\n",
-    //     accel.x, accel.y, accel.z, (intr) ? 1 : 0, BMI160.isMotionDetect(val), BMI160.isHighGDetect(val), val);
+
+#if 0
     Serial1.printf("%2.3f,%2.3f,%2.3f,%u,%u,%u\r\n",
         accel.x, accel.y, accel.z, (intr) ? 1 : 0, BMI270.isMotionDetect(val), BMI270.isHighGDetect(val));
+#endif
+
+    if( BMI270.isMotionDetect(val) )
+    {
+        Serial1.println("Motion");
+    }
 
     // Keep from going to sleep by moving timeout ahead
     if (intr) {
