@@ -879,6 +879,7 @@ void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *con
     // Check for Tracker One hardware
     switch (Tracker::instance().getModel()) {
         case TRACKER_MODEL_TRACKERONE:
+        case TRACKER_MODEL_TRACKERM:
         // Fall through
         case TRACKER_MODEL_MONITORONE: {
             writer.name("temp").value(get_temperature(), 1);
