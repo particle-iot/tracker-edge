@@ -222,14 +222,18 @@ int TrackerImu::waitOnEvent(BmiEventType& event, system_tick_t timeout)
     {
         case BmiVariant::IMU_BMI160:
         {
-            Bmi160::Bmi160EventType evt160 = (Bmi160::Bmi160EventType)event;
-            return BMI160.waitOnEvent(evt160, timeout);
+            Bmi160::Bmi160EventType evt160;
+            auto status = BMI160.waitOnEvent(evt160, timeout);
+            event = static_cast<BmiEventType>(evt160);
+            return status;
             break;
         }
         case BmiVariant::IMU_BMI270:
         {
-            Bmi270::Bmi270EventType evt270 = (Bmi270::Bmi270EventType)event;
-            return BMI270.waitOnEvent(evt270, timeout);
+            Bmi270::Bmi270EventType evt270;
+            auto status = BMI270.waitOnEvent(evt270, timeout);
+            event = static_cast<BmiEventType>(evt270);
+            return status;
             break;
         }
     }
