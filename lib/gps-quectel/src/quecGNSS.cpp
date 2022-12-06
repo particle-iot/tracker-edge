@@ -836,7 +836,7 @@ double quectelGPS::getHorizontalAccuracy(void)
 
 double quectelGPS::getVerticalAccuracy(void)
 {
-    return _gpsParser.v_accuracy;
+    return _gpsParser.epe_3d;
 }
 
 
