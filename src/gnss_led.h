@@ -17,7 +17,7 @@
 #pragma once
 
 #include "location_service.h"
-#include "IGnssLed.hpp"
+#include "IGnssLed.h"
 
 using namespace particle;
 

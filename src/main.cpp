@@ -16,8 +16,8 @@
 
 #include "Particle.h"
 #include "EdgePlatform.h"
-#include "MonitorOneConfiguration.hpp"
-#include "TrackerOneConfiguration.hpp"
+#include "MonitorOneConfiguration.h"
+#include "TrackerOneConfiguration.h"
 #include "TrackerMConfiguration.h"
 #include "tracker_config.h"
 #include "tracker.h"

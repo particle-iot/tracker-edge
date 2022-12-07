@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "IEdgePlatformConfiguration.hpp"
+#include "IEdgePlatformConfiguration.h"
 #include "tracker_config.h"
-#include "IoGnssLed.hpp"
+#include "IoGnssLed.h"
 
 class TrackerOneConfiguration: public IEdgePlatformConfiguration
 {

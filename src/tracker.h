@@ -38,7 +38,7 @@
 #ifdef TRACKER_USE_MEMFAULT
 #include "memfault.h"
 #endif // TRACKER_USE_MEMFAULT
-#include "IEdgePlatformConfiguration.hpp"
+#include "IEdgePlatformConfiguration.h"
 
 //
 // Default configuration

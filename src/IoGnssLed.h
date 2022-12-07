@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Particle.h"
-#include "IGnssLed.hpp"
+#include "IGnssLed.h"
 
 namespace particle
 {

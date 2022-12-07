@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "IEdgePlatformConfiguration.hpp"
+#include "IEdgePlatformConfiguration.h"
 #include "tracker_config.h"
 
 

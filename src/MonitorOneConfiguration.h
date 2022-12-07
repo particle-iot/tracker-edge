@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "IEdgePlatformConfiguration.hpp"
+#include "IEdgePlatformConfiguration.h"
 #include "tracker_config.h"
 #include "tracker_user_rgb.h"
-#include "Adp8866GnssLed.hpp"
+#include "Adp8866GnssLed.h"
 
 enum class TrackerPmicChargeTimer {
     CHARGE_00_05_HOURS = 0,         // 00 – 5  hrs

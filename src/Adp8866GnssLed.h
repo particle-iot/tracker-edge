@@ -2,7 +2,7 @@
 
 #include "Particle.h"
 #include "adp8866_rgb.h"
-#include "IGnssLed.hpp"
+#include "IGnssLed.h"
 
 namespace particle
 {
