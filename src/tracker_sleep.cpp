@@ -43,7 +43,7 @@ int TrackerSleep::enterReset() {
   return SYSTEM_ERROR_NONE;
 }
 
-int TrackerSleep::handleReset(CloudServiceStatus status, JSONValue *root, const void *context) {
+int TrackerSleep::handleReset(JSONValue *root) {
   _pendingReset = true;
 
   return 0;
@@ -78,7 +78,7 @@ int TrackerSleep::init(SleepWatchdogCallback watchdog) {
   TrackerLocation::instance().regLocGenCallback([this](JSONWriter& writer, LocationPoint &loc, const void *context){annoucePublish();});
 
   // Register 'reset' command from the cloud
-  CloudService::instance().regCommandCallback("reset", &TrackerSleep::handleReset, this);
+  CloudService::instance().registerCommand("reset", std::bind(&TrackerSleep::handleReset, this, std::placeholders::_1));
 
   return SYSTEM_ERROR_NONE;
 }

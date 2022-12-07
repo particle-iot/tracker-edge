@@ -153,12 +153,12 @@ int TrackerShipping::enter(bool checkPower)
     return 0; // compiler warnings about no return...
 }
 
-int TrackerShipping::enter_cb(CloudServiceStatus status, JSONValue *root, const void *context)
+int TrackerShipping::enter_cb(JSONValue *root)
 {
     return enter();
 }
 
 void TrackerShipping::init()
 {
-    CloudService::instance().regCommandCallback("enter_shipping", &TrackerShipping::enter_cb, this);
+    CloudService::instance().registerCommand("enter_shipping", std::bind(&TrackerShipping::enter_cb, this, std::placeholders::_1));
 }

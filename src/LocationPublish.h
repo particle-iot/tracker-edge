@@ -96,14 +96,11 @@ public:
      * @param[in] status of the message that was published
      * @param[in] rsp_root JSON root of the message
      * @param[in] req_event data containing the message in JSON format
-     * @param[in] context of the callback
      *
      * @return 0 for success
      */
     int disk_queue_cb(CloudServiceStatus status,
-                    JSONValue * rsp_root,
-                    const char * req_event,
-                    const void *context);
+                      const String &req_event);
 
     /**
      * @brief Return the state of the store_config.enable variable
@@ -137,24 +134,4 @@ private:
 
     DiskQueue store_msg_queue;
     StoreConfig store_config;
-
-    /**
-     * @brief Wrapper that is used to call the
-     * TrackerLocation::location_publish_cb, on every publish
-     *
-     * @details This is a callback that is used when we resend a stored message.
-     * This is just a convenience wrapper to be able to call the
-     * TrackerLocation::location_publish_cb outside of it's class
-     *
-     * @param[in] status of the message that was published
-     * @param[in] rsp_root JSON root of the message
-     * @param[in] req_event data containing the message in JSON format
-     * @param[in] context of the callback
-     *
-     * @return 0 for success
-     */
-    int loc_store_cb_wrapper(CloudServiceStatus status,
-                                        JSONValue *rsp_root,
-                                        const char *req_event,
-                                        const void *context);
 };

@@ -53,7 +53,7 @@ class TrackerShipping
         bool _checkPower;
         bool _pmicFire;
 
-        int enter_cb(CloudServiceStatus status, JSONValue *root, const void *context);
+        int enter_cb(JSONValue *root);
         void shutdown();
         static void pmicHandler();
 };

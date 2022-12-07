@@ -38,6 +38,7 @@ static constexpr uint32_t WifiPowerScanSec = 1; // seconds - time to wait for Wi
 static constexpr size_t EnhancedLocationQueueSize = 5; // up to this many elements
 static constexpr size_t ObjectEstimateWpsHeaderSize = sizeof(",{\"wps\":[]}") - 1 /* null */;
 static constexpr size_t ObjectEstimateWpsDataSize = sizeof("{\"bssid\":\"00:11:22:33:44:55\",\"ch\":99,\"str\":-999},") - 1 /* null */;
+static constexpr size_t ObjectEstimateEndCommandSize = sizeof(",\"req_id\":4294967295}") - 1; /* null */;
 
 static int set_radius_cb(double value, const void *context)
 {
@@ -83,9 +84,7 @@ int TrackerLocation::exit_location_config_cb(bool write, int status, const void 
     return status;
 }
 
-int TrackerLocation::get_loc_cb(CloudServiceStatus status,
-    JSONValue *root,
-    const void *context)
+int TrackerLocation::get_loc_cb(JSONValue *root)
 {
    triggerLocPub(Trigger::IMMEDIATE);
    return 0;
@@ -205,7 +204,7 @@ void TrackerLocation::init(unsigned int gnssRetries)
     });
     ConfigService::instance().registerModule(geofence_desc);
 
-    CloudService::instance().regCommandCallback("get_loc", &TrackerLocation::get_loc_cb, this);
+    CloudService::instance().registerCommand("get_loc", std::bind(&TrackerLocation::get_loc_cb, this, std::placeholders::_1));
 
     _last_location_publish_sec = System.uptime() - _config_state.interval_min_seconds;
 
@@ -218,7 +217,7 @@ void TrackerLocation::init(unsigned int gnssRetries)
     _geofence.RegisterGeofenceCallback([this](CallbackContext& context){ this->onGeofenceCallback(context); });
     _geofence.init();
 
-    CloudService::instance().regCommandCallback("loc-enhanced", &TrackerLocation::enhanced_cb, this);
+    CloudService::instance().registerCommand("loc-enhanced", std::bind(&TrackerLocation::enhanced_cb, this, std::placeholders::_1));
 
     _gnssRetryDefault = gnssRetries;
     setGnssCycle();
@@ -278,10 +277,7 @@ int TrackerLocation::buildEnhLocation(JSONValue& node, LocationPoint& point) {
     return 0;
 }
 
-int TrackerLocation::enhanced_cb(CloudServiceStatus status, JSONValue *root, const void *context) {
-    (void)status;
-    (void)context;
-
+int TrackerLocation::enhanced_cb(JSONValue *root) {
     LocationPoint point = {};
     JSONValue* locObject = nullptr;
     JSONValue child;
@@ -316,18 +312,16 @@ int TrackerLocation::regLocGenCallback(
 // register for callback on location publish success/fail
 // these callbacks are NOT persistent and are used for the next publish
 int TrackerLocation::regLocPubCallback(
-    cloud_service_send_cb_t cb,
-    const void *context)
+    std::function<int(CloudServiceStatus, const String&)> cb)
 {
-    locPubCallbacks.append(std::bind(cb, _1, _2, _3, context));
+    locPubCallbacks.append(cb);
     return 0;
 }
 
 int TrackerLocation::regPendLocPubCallback(
-    cloud_service_send_cb_t cb,
-    const void *context)
+    std::function<int(CloudServiceStatus, const String&)> cb)
 {
-    pendingLocPubCallbacks.append(std::bind(cb, _1, _2, _3, context));
+    pendingLocPubCallbacks.append(cb);
     return 0;
 }
 
@@ -366,48 +360,47 @@ int TrackerLocation::triggerLocPub(Trigger type, const char *s)
     return 0;
 }
 
-void TrackerLocation::issue_location_publish_callbacks(CloudServiceStatus status, JSONValue *rsp_root, const char *req_event)
+void TrackerLocation::issue_location_publish_callbacks(CloudServiceStatus status, const String& req_event)
 {
     for(auto cb : pendingLocPubCallbacks)
     {
-        cb(status, rsp_root, req_event);
+        cb(status, req_event);
     }
     pendingLocPubCallbacks.clear();
 }
 
-int TrackerLocation::location_publish_cb(CloudServiceStatus status, JSONValue *rsp_root, const char *req_event, const void *context)
+int TrackerLocation::location_publish_cb(CloudServiceStatus status, String&& req_event, std::uint32_t last_publish_time)
 {
     if(status == CloudServiceStatus::SUCCESS)
     {
         // this could either be on the Particle Cloud ack (default) OR the
         // end-to-end ACK
-        Log.info("location cb publish %lu success!", *(uint32_t *) context);
+        Log.info("location cb publish %lu success!", last_publish_time);
         _first_publish = false;
         _pending_first_publish = false;
     }
     else if(status == CloudServiceStatus::FAILURE)
     {
-        Log.info("location cb publish %lu failure", *(uint32_t *) context);
+        Log.info("location cb publish %lu failure", last_publish_time);
     }
     else if(status == CloudServiceStatus::TIMEOUT)
     {
-        Log.info("location cb publish %lu timeout", *(uint32_t *) context);
+        Log.info("location cb publish %lu timeout", last_publish_time);
     }
     else
     {
-        Log.info("location cb publish %lu unexpected status: %d", *(uint32_t *) context, status);
+        Log.info("location cb publish %lu unexpected status: %d", last_publish_time, status);
     }
 
     _publishAttempted++;
 
-    issue_location_publish_callbacks(status, rsp_root, req_event);
+    issue_location_publish_callbacks(status, req_event);
 
     return 0;
 }
 
 void TrackerLocation::location_publish()
 {
-    int rval;
     // maintain cloud service lock across the send to allow us to save off
     // the finalized loc publish to retry on failure
     std::lock_guard<CloudService> lg(CloudService::instance());
@@ -416,16 +409,9 @@ void TrackerLocation::location_publish()
         (_config_state.process_ack) ? CloudServicePublishFlags::FULL_ACK : CloudServicePublishFlags::NONE;
 
     // publish a new loc (contained in cloud_service buffer)
-    rval = CloudService::instance().send(WITH_ACK,
+    CloudService::instance().send(WITH_ACK,
         cloud_flags,
-        &TrackerLocation::location_publish_cb, this,
-        CLOUD_DEFAULT_TIMEOUT_MS, &_last_location_publish_sec);
-
-    //if error issue the user defined callbacks
-    if(rval)
-    {
-        issue_location_publish_callbacks(CloudServiceStatus::FAILURE, NULL, CloudService::instance().writer().buffer());
-    }
+        std::bind(&TrackerLocation::location_publish_cb, this, std::placeholders::_1, std::placeholders::_2, _last_location_publish_sec));
 }
 
 void TrackerLocation::enableNetwork() {
@@ -910,14 +896,12 @@ void TrackerLocation::buildPublish(LocationPoint& cur_loc, bool error) {
         }
 
         size_t remainingSize = cloud_service.writer().bufferSize() - 1 /* null */
-            - cloud_service.writer().dataSize() - cloud_service.estimatedEndCommandSize();
+            - cloud_service.writer().dataSize() - ObjectEstimateEndCommandSize;
 
         // Populate cellular tower information for publish
         remainingSize -= buildTowerInfo(cloud_service.writer(), remainingSize);
         remainingSize -= buildWpsInfo(cloud_service.writer(), remainingSize);
     }
-
-    Log.info("%.*s", cloud_service.writer().dataSize(), cloud_service.writer().buffer());
 }
 
 void TrackerLocation::loop() {

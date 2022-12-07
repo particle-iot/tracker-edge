@@ -128,23 +128,19 @@ class TrackerLocation
         // register for callback on location publish success/fail
         // these callbacks are NOT persistent and are used for the next publish
         int regLocPubCallback(
-            cloud_service_send_cb_t cb,
-            const void *context=nullptr);
+            std::function<int(CloudServiceStatus, const String&)> cb);
 
         template <typename T>
         int regLocPubCallback(
-            int (T::*cb)(CloudServiceStatus status, JSONValue *, const char *, const void *context),
-            T *instance,
-            const void *context=nullptr);
+            int (T::*cb)(CloudServiceStatus status, const String&),
+            T *instance);
 
-        int regPendLocPubCallback(cloud_service_send_cb_t cb,
-                                const void *context=nullptr);
+        int regPendLocPubCallback(std::function<int(CloudServiceStatus, const String&)> cb);
 
         template <typename T>
         int regPendLocPubCallback(
-            int (T::*cb)(CloudServiceStatus status, JSONValue *, const char *, const void *context),
-            T *instance,
-            const void *context=nullptr);
+            int (T::*cb)(CloudServiceStatus status, const String&),
+            T *instance);
 
         // register for callback after location publish for the cloud supplied ehanced callback
         // these callbacks are persistent and not removed on generation
@@ -171,8 +167,8 @@ class TrackerLocation
             return _geofence;
         }
         bool isProcessAckEnabled() {return _config_state.process_ack;}
-        int location_publish_cb(CloudServiceStatus status, JSONValue *, const char *req_event, const void *context);
-        void issue_location_publish_callbacks(CloudServiceStatus status, JSONValue *, const char *req_event);
+        int location_publish_cb(CloudServiceStatus status, String&& req_event, std::uint32_t last_publish_time);
+        void issue_location_publish_callbacks(CloudServiceStatus status, const String &req_event);
 
     private:
         TrackerLocation() :
@@ -231,7 +227,7 @@ class TrackerLocation
         int enter_location_config_cb(bool write, const void *context);
         int exit_location_config_cb(bool write, int status, const void *context);
 
-        int get_loc_cb(CloudServiceStatus status, JSONValue *root, const void *context);
+        int get_loc_cb(JSONValue *root);
 
         void location_publish();
 
@@ -253,7 +249,7 @@ class TrackerLocation
         size_t buildWpsInfo(JSONBufferWriter& writer, size_t size);
 
         int buildEnhLocation(JSONValue& node, LocationPoint& point);
-        int enhanced_cb(CloudServiceStatus status, JSONValue* root, const void* context);
+        int enhanced_cb(JSONValue* root);
 
         unsigned int setGnssCycle() {
             return _gnssCycleCurrent = _gnssRetryDefault + 1; // Initial attempt plus retries
@@ -285,9 +281,9 @@ class TrackerLocation
 
         Vector<std::function<void(JSONWriter&, LocationPoint&)>> locGenCallbacks;
         // publish callback for the next publish (not in flight)
-        Vector<std::function<void(CloudServiceStatus status, JSONValue *, const char *)>> locPubCallbacks;
+        Vector<std::function<void(CloudServiceStatus status, const String&)>> locPubCallbacks;
         // publish callbacks for the current/pending publish (in flight)
-        Vector<std::function<void(CloudServiceStatus status, JSONValue *, const char *)>> pendingLocPubCallbacks;
+        Vector<std::function<void(CloudServiceStatus status, const String&)>> pendingLocPubCallbacks;
         // publish callbacks for the enhanced location callback
         Vector<std::function<void(const LocationPoint&)>> enhancedLocCallbacks;
         os_queue_t _enhancedLocQueue;
@@ -301,25 +297,23 @@ int TrackerLocation::regLocGenCallback(
     T *instance,
     const void *context)
 {
-    return regLocGenCallback(std::bind(cb, instance, _1, _2, _3), context);
+    return regLocGenCallback(std::bind(cb, instance, _1, _2), context);
 }
 
 template <typename T>
 int TrackerLocation::regLocPubCallback(
-    int (T::*cb)(CloudServiceStatus status, JSONValue *, const char *, const void *context),
-    T *instance,
-    const void *context)
+    int (T::*cb)(CloudServiceStatus status, const String &),
+    T *instance)
 {
-    return regLocPubCallback(std::bind(cb, instance, _1, _2, _3, _4), context);
+    return regLocPubCallback(std::bind(cb, instance, _1, _2));
 }
 
 template <typename T>
 int TrackerLocation::regPendLocPubCallback(
-    int (T::*cb)(CloudServiceStatus status, JSONValue *, const char *, const void *context),
-    T *instance,
-    const void *context)
+    int (T::*cb)(CloudServiceStatus status, const String &),
+    T *instance)
 {
-    return regPendLocPubCallback(std::bind(cb, instance, _1, _2, _3, _4), context);
+    return regPendLocPubCallback(std::bind(cb, instance, _1, _2));
 }
 
 template <typename T>

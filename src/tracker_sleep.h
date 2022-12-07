@@ -506,7 +506,7 @@ private:
    * @param context Usually this*
    * @return int Success (zero)
    */
-  int handleReset(CloudServiceStatus status, JSONValue *root, const void *context);
+  int handleReset(JSONValue *root);
 
   /**
    * @brief Schedules system wake at specific time in relation to System.millis().
