@@ -68,6 +68,8 @@ constexpr float DURATION_COUNTS_PER_MS  = (1000.0f / 5.0f);
 constexpr float HYSTERESIS_COUNTS_PER_G = (2.0f * 1000.0f / 0.49f);
 constexpr float THRESHOLD_COUNTS_PER_G  = (10000.0f/4.9f);
 
+constexpr uint32_t INVALID_VALUE        = 0xFFFF;
+
 
 //**************** GLOBALS ******************
 constexpr uint8_t MAX_NUM_SENSOR_TYPES = 2U;
@@ -776,18 +778,30 @@ int Bmi270::getStatus(uint32_t& val, bool clear)
     if( BMI2_OK != bmi2_get_int_status(reinterpret_cast<uint16_t*>(&val), &bmi2_) ) 
     {
         return SYSTEM_ERROR_INTERNAL;
-    }
+    }   
 
     return SYSTEM_ERROR_NONE;
 }
 
 bool Bmi270::isMotionDetect(uint32_t val) 
 {
+    // Validate the status value before masking
+    if( INVALID_VALUE == val )
+    {
+        return false;
+    }
+
     return ((uint16_t)val & BMI270_LEGACY_ANY_MOT_STATUS_MASK) ? true : false;
 }
 
 bool Bmi270::isHighGDetect(uint32_t val) 
 {
+    // Validate the status value before masking
+    if( INVALID_VALUE == val )
+    {
+        return false;
+    }
+
     return ((uint16_t)val & BMI270_LEGACY_HIGH_G_STATUS_MASK) ? true : false;
 }
 
