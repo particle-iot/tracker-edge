@@ -43,10 +43,7 @@ SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
 
 void setup()
 {
-    //waitUntil(Serial.isConnected);
-
-    //delay(5000);
-    // Read OTP to determine configuration
+    // NOTE: This will be moved into Tracker::instance().init() and handled there
     auto status = EdgePlatform::instance().init();
     if(status)
     {
