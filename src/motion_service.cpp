@@ -91,7 +91,7 @@ int MotionService::start(size_t eventDepth) {
 
     int ret = SYSTEM_ERROR_NONE;
 
-    auto imu = IMU.getImuType();
+    [[maybe_unused]] auto imu = IMU.getImuType();
 
     // Retrieve (if first time) instance of the BMI160/BMI270 IMU device
     ret = IMU.begin(BMI_SPI_INTERFACE, BMI_SPI_CS_PIN, BMI_INT_PIN);
