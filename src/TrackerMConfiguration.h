@@ -27,12 +27,10 @@ public:
     {
         commonCfg.chargeCurrentHigh = 1024; // milliamps
         commonCfg.inputCurrent = 1500; // milliamps 
-        Log.info("### %s ###",__FUNCTION__);
     }
 
     void load_specific_platform_config()
     {
-        Log.info("### %s ###",__FUNCTION__);
     }
 protected:
 

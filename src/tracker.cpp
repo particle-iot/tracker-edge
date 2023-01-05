@@ -576,9 +576,7 @@ int Tracker::init()
 #endif // TRACKER_MODEL_NUMBER
 
     EdgePlatform::instance().init();
-    EdgePlatform::instance().readHwInfo();
-    switch (EdgePlatform::instance().getModel())
-    {
+    switch (EdgePlatform::instance().getModel()) {
         case EdgePlatform::TrackerModel::eMONITOR_ONE:
             _platformConfig = new MonitorOneConfiguration();
             _commonCfgData = _platformConfig->get_common_config_data();

@@ -28,12 +28,10 @@ public:
         commonCfg.chargeCurrentHigh = 1024; // milliamps
         commonCfg.inputCurrent = 1500; // milliamps 
         commonCfg.pGnssLed = new IoGnssLed(TRACKER_GNSS_LOCK_LED);
-        Log.info("### %s ###",__FUNCTION__);
     }
 
     void load_specific_platform_config()
     {
-        Log.info("### %s ###",__FUNCTION__);
     }
 protected:
 

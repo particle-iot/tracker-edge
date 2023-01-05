@@ -17,8 +17,6 @@
 #pragma once
 
 #include "Particle.h"
-#include <map>
-
 
 /**
  * @brief Class used to read and parse OTP fields.
@@ -114,20 +112,10 @@ public:
     }
 
     /**
-     * @brief Populate lookup tables used by this class
-     *
-     * @retval true Successful
-     * @retval false Failure
-     */
-    bool init();
-
-    /**
      * @brief Read OTP region for hardware information
      *
-     * @retval true Successful
-     * @retval false Failure
      */
-    bool readHwInfo();
+    void init();
 
     /**
      * @brief Return Tracker model type
@@ -218,11 +206,4 @@ private:
     WiFiVariant    wifi_          {WiFiVariant::eWIFI_INVALID};
     FuelGaugeType  fg_            {FuelGaugeType::eFG_INVALID};
     SensirionType  sensirion_     {SensirionType::eSENSE_INVALID};
-
-    std::map<uint32_t,TrackerModel>  modelTable_ {};
-    std::map<uint8_t,GnssVariant>    gnssTable_ {};
-    std::map<uint8_t,ImuVariant>     imuTable_ {};
-    std::map<uint8_t,WiFiVariant>    wifiTable_ {};
-    std::map<uint8_t,Ilim>           currentTable_ {};
-    std::map<uint8_t,ThermistorType> thermistorTable_ {};
 };

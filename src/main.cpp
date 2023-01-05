@@ -15,9 +15,6 @@
  */
 
 #include "Particle.h"
-#include "MonitorOneConfiguration.h"
-#include "TrackerOneConfiguration.h"
-#include "TrackerMConfiguration.h"
 #include "tracker_config.h"
 #include "tracker.h"
 

@@ -72,12 +72,10 @@ public:
         commonCfg.memfaultTemperatureScaling = 10.0f; // scaling for temperature reporting
         commonCfg.memfaultTemperatureInvalid = -300.0f; // invalid temperature   
         commonCfg.pGnssLed = nullptr;
-        Log.info("### %s ###",__FUNCTION__);
     }
 
     EdgePlatformCommonConfiguration get_common_config_data()
     {
-        Log.info("### %s ###",__FUNCTION__);        
         return commonCfg;
     }
 

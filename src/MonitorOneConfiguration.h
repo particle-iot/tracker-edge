@@ -45,12 +45,10 @@ public:
             TrackerUserRGB::instance().get_rgb2_instance().on();
         }
         commonCfg.pGnssLed = new Adp8866GnssLed(TrackerUserRGB::instance().get_rgb1_instance());
-        Log.info("### %s ###",__FUNCTION__);
     }
 
     void load_specific_platform_config()
     {
-        Log.info("### %s ###",__FUNCTION__);        
         updatePmicChargeTimer(TrackerPmicChargeTimer::CHARGE_11_20_HOURS);
     }
 
