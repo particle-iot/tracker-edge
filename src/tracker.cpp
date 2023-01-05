@@ -15,12 +15,15 @@
  */
 
 #include "dct.h"
-
+#include "EdgePlatform.h"
 #include "tracker.h"
 #include "tracker_cellular.h"
 #include "mcp_can.h"
+#include "MonitorOneConfiguration.h"
 #include "LocationPublish.h"
 #include "tracker_fuelgauge.h"
+#include "TrackerOneConfiguration.h"
+#include "TrackerMConfiguration.h"
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -572,7 +575,23 @@ int Tracker::init()
 #endif // TRACKER_MODEL_VARIANT
 #endif // TRACKER_MODEL_NUMBER
 
-
+    EdgePlatform::instance().init();
+    EdgePlatform::instance().readHwInfo();
+    switch (EdgePlatform::instance().getModel())
+    {
+        case EdgePlatform::TrackerModel::eMONITOR_ONE:
+            _platformConfig = new MonitorOneConfiguration();
+            _commonCfgData = _platformConfig->get_common_config_data();
+            break;
+        case EdgePlatform::TrackerModel::eTRACKER_ONE:
+            _platformConfig = new TrackerOneConfiguration();
+            _commonCfgData = _platformConfig->get_common_config_data();
+            break;
+        case EdgePlatform::TrackerModel::eTRACKER_M:
+            _platformConfig = new TrackerMConfiguration();
+            _commonCfgData = _platformConfig->get_common_config_data();
+            break;
+    }
 
     // Initialize unused interfaces and pins
     (void)initIo();
