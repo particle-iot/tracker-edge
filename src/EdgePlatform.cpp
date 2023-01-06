@@ -155,7 +155,7 @@ void EdgePlatform::init()
 
     if ((byte3 & THERMISTOR_MASK) == THERMISTOR_SOFT) {
         tr_ = ThermistorType::eSOFTWARE;
-    else {
+    } else {
         tr_ = ThermistorType::ePMIC;
     }
 
