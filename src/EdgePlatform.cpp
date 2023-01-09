@@ -114,10 +114,10 @@ void EdgePlatform::init()
 
     switch (byte2 & IMU_MASK) {
     case IMU_BMI160:
-        imu_ = ImuVariant::eBMI270;
+        imu_ = ImuVariant::eBMI160;
         break;
     case IMU_BMI270:
-        imu_ = ImuVariant::eBMI160;
+        imu_ = ImuVariant::eBMI270;
         break;
     }
 
