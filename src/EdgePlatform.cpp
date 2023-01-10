@@ -165,9 +165,12 @@ void EdgePlatform::init()
         currentLimit_ = Ilim::eILIM_3;
     }
 
-    // Sensirion sensor type is currently not a field in OTP.
-    // However, there may be a field in the future.
-    sensirion_ = EdgePlatform::SensirionType::eSTS31;
+    // Sensirion sensor type is currently not a field in OTP. However, there may be a field in the future. 
+    if( TRACKER_MODEL_MONITORONE == info.model ) {
+        sensirion_ = EdgePlatform::SensirionType::eSTS31;
+    } else {
+        sensirion_ = EdgePlatform::SensirionType::eSENSE_INVALID;
+    }
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     // Tracker-M is fixed with these peripherals
     model_ = EdgePlatform::TrackerModel::eTRACKER_M;
