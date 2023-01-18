@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Particle Industries, Inc.
+ * Copyright (c) 2023 Particle Industries, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "IEdgePlatformConfiguration.h"
 #include "tracker_config.h"
 #include "tracker_user_rgb.h"
 #include "Adp8866GnssLed.h"
@@ -32,11 +31,16 @@ enum class TrackerPmicChargeTimer {
 class MonitorOneConfiguration: public IEdgePlatformConfiguration
 {
 public:
+    /**
+     * @brief Constructor
+     *
+     */
     MonitorOneConfiguration()
     {
         commonCfg.chargeCurrentHigh = 1536; // milliamps
         commonCfg.inputCurrent = 2048; // milliamps
 
+        // Configure User LED
         if(TrackerUserRGB::instance().init() == SYSTEM_ERROR_NONE)
         {
             TrackerUserRGB::instance().get_rgb2_instance().brightness(80);
@@ -47,13 +51,24 @@ public:
         commonCfg.pGnssLed = new Adp8866GnssLed(TrackerUserRGB::instance().get_rgb1_instance());
     }
 
+    /**
+     * @brief Loads MonitorOne-specific configuration information
+     *
+     * @return None
+     */
     void load_specific_platform_config()
     {
         updatePmicChargeTimer(TrackerPmicChargeTimer::CHARGE_11_20_HOURS);
     }
 
 private:
-    // Update PMIC Charge Timer
+    /**
+     * @brief Update PMIC Charge Timer
+     *
+     * @param[in] timer timer ID
+     *
+     * @return None
+     */
     void updatePmicChargeTimer(TrackerPmicChargeTimer timer)
     {
         uint8_t reg = CHARGE_TIMER_CONTROL_REGISTER,data = 0x00;
@@ -66,7 +81,7 @@ private:
         {
             data &= 0xF9;
             data |= (static_cast<uint8_t>(timer) << 1) & 0x06;
-#if (PLATFORM_ID != PLATFORM_TRACKERM)            
+#if (PLATFORM_ID != PLATFORM_TRACKERM)
             WITH_LOCK(Wire1)
             {
                 WireTransmission config(PMIC_ADDRESS);
@@ -74,14 +89,14 @@ private:
                 Wire1.beginTransmission(config);
                 Wire1.write(reg);
                 Wire1.write(data);
-                Wire1.endTransmission();                        
+                Wire1.endTransmission();
             }
-#endif            
+#endif
             //readbackData = pmic.readChargeTermRegister();
         }
         else
         {
             return;
-        }        
+        }
     }
 };

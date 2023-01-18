@@ -49,6 +49,11 @@ void memfault_metrics_heartbeat_collect_data(void)
     Tracker::instance().collectMemfaultHeartbeatMetrics();
 }
 
+void __attribute__((weak)) monitorOneUserFunction() 
+{
+    
+}
+
 Tracker *Tracker::_instance = nullptr;
 
 Tracker::Tracker() :
@@ -580,6 +585,7 @@ int Tracker::init()
         case EdgePlatform::TrackerModel::eMONITOR_ONE:
             _platformConfig = new MonitorOneConfiguration();
             _commonCfgData = _platformConfig->get_common_config_data();
+            monitorOneUserFunction();
             break;
         case EdgePlatform::TrackerModel::eTRACKER_ONE:
             _platformConfig = new TrackerOneConfiguration();
