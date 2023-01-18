@@ -96,7 +96,7 @@ int LocationService::begin(const LocationServiceConfiguration& config) {
     }
     else
     {
-        CHECK_FALSE(quecGps_, SYSTEM_ERROR_INVALID_STATE);       
+        CHECK_FALSE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
 
         do {
             quecGps_ = new quectelGPS(QUECTEL_GNSS_I2C_INTERFACE, QUECTEL_GNSS_PWR_EN_PIN,
@@ -109,7 +109,7 @@ int LocationService::begin(const LocationServiceConfiguration& config) {
 
             // Initialize properties of GNSS module
             quecGps_->quectelDevInit();
-            
+
             return SYSTEM_ERROR_NONE;
         } while (false);
     }
@@ -127,7 +127,7 @@ void LocationService::cleanup() {
             delete ubloxGps_;
         }
     }
-    else 
+    else
     {
         if (quecGps_) {
             delete quecGps_;
@@ -166,9 +166,9 @@ bool LocationService::getFastLock() {
 
 bool LocationService::configureGPS(LocationServiceConfiguration& config) {
     enableHotStartOnWake_ = config.enableHotStartOnWake();
-    
+
     bool ret = true;
-    
+
     WITH_LOCK(*ubloxGps_) {
         setFastLock(_deviceConfig.enableFastLock());
         ret &= ubloxGps_->setMode(_deviceConfig.udrModel());
@@ -182,7 +182,7 @@ bool LocationService::configureGPS(LocationServiceConfiguration& config) {
         ret &= ubloxGps_->setIMUtoVRP(
             _deviceConfig.imuToVRPX(),
             _deviceConfig.imuToVRPY(),
-            _deviceConfig.imuToVRPZ()    
+            _deviceConfig.imuToVRPZ()
         );
         ret &= ubloxGps_->setAOPSettings(_deviceConfig.enableAssistNowAutonomous());
     }
@@ -211,7 +211,7 @@ int LocationService::start(bool restart) {
             CHECK_TRUE(configureGPS(_deviceConfig), SYSTEM_ERROR_INVALID_STATE);
         }
     }
-    else 
+    else
     {
         CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
 
@@ -263,6 +263,8 @@ int LocationService::getLocation(LocationPoint& point) {
             point.lockedDuration = ubloxGps_->getLockDuration();
             point.epochTime = (time_t)ubloxGps_->getUTCTime();
             point.timeScale = LocationTimescale::TIMESCALE_UTC;
+            point.satsInUse = ubloxGps_->getSatellites();
+            point.satsInView = ubloxGps_->getSatellitesDesc(point.sats_in_view_desc);
             if (point.locked) {
                 point.latitude = ubloxGps_->getLatitude();
                 point.longitude = ubloxGps_->getLongitude();
@@ -284,6 +286,8 @@ int LocationService::getLocation(LocationPoint& point) {
             point.lockedDuration = quecGps_->getLockDuration();
             point.epochTime = (time_t)quecGps_->getUTCTime();
             point.timeScale = LocationTimescale::TIMESCALE_UTC;
+            point.satsInUse = quecGps_->getSatellites();
+            point.satsInView = quecGps_->getSatellitesDesc(point.sats_in_view_desc);
             if (point.locked) {
                 point.latitude = quecGps_->getLatitude();
                 point.longitude = quecGps_->getLongitude();
@@ -489,9 +493,9 @@ bool LocationService::isActive() {
     {
         return ubloxGps_->is_active();
     }
-    
+
     return false;
-}; 
+};
 
 bool LocationService::assertSelect(bool select)
 {

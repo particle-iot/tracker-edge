@@ -867,6 +867,8 @@ void TrackerLocation::buildPublish(LocationPoint& cur_loc, bool error) {
     else {
         cloud_service.writer().name("lck").value(0);
     }
+    cloud_service.writer().name("satu").value(cur_loc.satsInUse);
+    cloud_service.writer().name("satv").value(cur_loc.satsInView);
 
     for(auto cb : locGenCallbacks) {
         cb(cloud_service.writer(), cur_loc);
