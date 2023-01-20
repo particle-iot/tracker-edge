@@ -49,9 +49,9 @@ void memfault_metrics_heartbeat_collect_data(void)
     Tracker::instance().collectMemfaultHeartbeatMetrics();
 }
 
-void __attribute__((weak)) monitorOneUserFunction() 
+void __attribute__((weak)) monitorOneUserFunction()
 {
-    
+
 }
 
 Tracker *Tracker::_instance = nullptr;
@@ -172,7 +172,7 @@ void Tracker::enableIoCanPower(bool enable)
 int Tracker::initEsp32()
 {
     // ESP32 related GPIO
-#if (PLATFORM_ID == PLATFORM_TRACKER)    
+#if (PLATFORM_ID == PLATFORM_TRACKER)
     pinMode(ESP32_BOOT_MODE_PIN, OUTPUT);
     digitalWrite(ESP32_BOOT_MODE_PIN, HIGH);
     pinMode(ESP32_PWR_EN_PIN, OUTPUT);
@@ -329,13 +329,6 @@ void Tracker::batteryStateHandler(system_event_t event, int data) {
 void Tracker::initBatteryMonitor() {
     auto powerConfig = System.getPowerConfiguration();
     // Start battery charging at low current state from boot then increase if necessary
-    // if ((powerConfig.batteryChargeCurrent() != TrackerChargeCurrentLow) ||
-    //     (powerConfig.powerSourceMaxCurrent() != TrackerInputCurrent)) {
-
-    //     powerConfig.batteryChargeCurrent(TrackerChargeCurrentLow);
-    //     powerConfig.powerSourceMaxCurrent(TrackerInputCurrent);
-    //     System.setPowerConfiguration(powerConfig);
-    // }
     if ((powerConfig.batteryChargeCurrent() != _commonCfgData.chargeCurrentHigh) ||
         (powerConfig.powerSourceMaxCurrent() != _commonCfgData.inputCurrent)) {
 
@@ -495,7 +488,7 @@ void Tracker::onWake(TrackerSleepContext context)
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
         case TRACKER_MODEL_MONITORONE: {
-            GnssLedEnable(true);        
+            GnssLedEnable(true);
             // Ensure battery evaluation starts immediately after waking
             _evalTick = 0;
         }
@@ -603,7 +596,7 @@ int Tracker::init()
     // Perform IO setup specific to Tracker One.  Reset the fuel gauge state-of-charge, check if under thresholds.
     BLE.selectAntenna(BleAntennaType::EXTERNAL);
     initBatteryMonitor();
-    
+
     // Setup device monitoring configuration here
     static ConfigObject deviceMonitoringDesc
     (
@@ -644,7 +637,7 @@ int Tracker::init()
             );
         }
         break;
-        case TRACKER_MODEL_MONITORONE: {        
+        case TRACKER_MODEL_MONITORONE: {
             temperature_init(TRACKER_89503_THERMISTOR,
                 [this](TemperatureChargeEvent event){ return chargeCallback(event); }
             );
@@ -689,7 +682,7 @@ int Tracker::init()
     location.regLocGenCallback(loc_gen_cb);
 
     _platformConfig->load_specific_platform_config();
-    
+
     return SYSTEM_ERROR_NONE;
 }
 
@@ -698,7 +691,7 @@ void Tracker::loop()
     if (_platformConfig == nullptr)
     {
         return;
-    }    
+    }
 
     uint32_t cur_sec = System.uptime();
 
