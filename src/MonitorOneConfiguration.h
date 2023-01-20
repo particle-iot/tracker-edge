@@ -71,8 +71,8 @@ private:
      */
     void updatePmicChargeTimer(TrackerPmicChargeTimer timer)
     {
-        uint8_t reg = CHARGE_TIMER_CONTROL_REGISTER,data = 0x00;
-        //,readbackData = 0x00;
+        [[maybe_unused]] uint8_t reg = CHARGE_TIMER_CONTROL_REGISTER,data = 0x00;
+
         PMIC pmic(true);
         data = pmic.readChargeTermRegister();
         TrackerPmicChargeTimer defaultTimer = static_cast<TrackerPmicChargeTimer>((data >> 1) & 0x03);
