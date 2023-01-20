@@ -26,7 +26,7 @@ public:
     TrackerMConfiguration()
     {
         commonCfg.chargeCurrentHigh = 1024; // milliamps
-        commonCfg.inputCurrent = 1500; // milliamps 
+        commonCfg.inputCurrent = 1500; // milliamps
     }
 
     void load_specific_platform_config()

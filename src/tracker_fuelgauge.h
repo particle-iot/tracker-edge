@@ -45,7 +45,7 @@ class TrackerFuelGauge
         float getVolt();
 #ifdef FUEL_GAUGE_TEST
         void enable_publish_pmic_regs(bool enable);
-#endif        
+#endif
     private:
         TrackerFuelGauge() {}
         void verify_model();

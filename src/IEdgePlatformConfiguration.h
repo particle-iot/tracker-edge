@@ -19,7 +19,7 @@
 #include "Particle.h"
 #include "IGnssLed.h"
 
-typedef struct 
+typedef struct
 {
     int canSleepRetries;
     int lowBatteryCutoff;
@@ -70,7 +70,7 @@ public:
         commonCfg.watchdogExpireTime = 60 * 1000; // milliseconds to expire the WDT
         commonCfg.memfaultBatteryScaling = 10.0f; // scaling for battery SOC reporting
         commonCfg.memfaultTemperatureScaling = 10.0f; // scaling for temperature reporting
-        commonCfg.memfaultTemperatureInvalid = -300.0f; // invalid temperature   
+        commonCfg.memfaultTemperatureInvalid = -300.0f; // invalid temperature
         commonCfg.pGnssLed = nullptr;
     }
 
@@ -81,5 +81,5 @@ public:
 
     virtual void load_specific_platform_config() = 0;
 protected:
-    EdgePlatformCommonConfiguration commonCfg; 
+    EdgePlatformCommonConfiguration commonCfg;
 };

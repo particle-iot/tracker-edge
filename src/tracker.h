@@ -298,7 +298,7 @@ class Tracker {
             _platformConfig = pConfig;
             _commonCfgData = _platformConfig->get_common_config_data();
             return init();
-        }        
+        }
 
         /**
          * @brief Perform device functionality for application loop()
@@ -510,5 +510,5 @@ class Tracker {
          * @param event Event class
          * @param data Particular event
          */
-        void otaHandler(system_event_t event, int data);  
+        void otaHandler(system_event_t event, int data);
 };

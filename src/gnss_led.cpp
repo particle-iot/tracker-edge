@@ -33,7 +33,7 @@ static void GnssLedTimer() {
         if (pInterface)
         {
             pInterface->off();
-        }        
+        }
         lastStatus_ = { .powered = -1, .locked = -1 };
         return;
     }
@@ -61,7 +61,7 @@ static void GnssLedTimer() {
             {
                 pInterface->off();
             }
-        }        
+        }
 
         blinkState_ = !blinkState_;
         return;
@@ -76,13 +76,13 @@ static void GnssLedTimer() {
     if (status.powered == 0) {
         if (pInterface)
         {
-            pInterface->off();            
+            pInterface->off();
         }
     }
     else if (status.locked) {
         if (pInterface)
         {
-            pInterface->on();            
+            pInterface->on();
         }
     }
     else {
@@ -113,7 +113,7 @@ int GnssLedInit(IGnssLed *pInstance) {
     pInterface = pInstance;
     if (pInterface)
     {
-        pInterface->init();            
+        pInterface->init();
     }
     enabled = false;
 
@@ -132,7 +132,7 @@ void GnssLedEnable(bool enable) {
     if (!enabled) {
         if (pInterface)
         {
-            pInterface->off();            
+            pInterface->off();
         }
     }
 }

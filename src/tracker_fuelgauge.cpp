@@ -173,7 +173,7 @@ void TrackerFuelGauge::test()
         cloud_service.writer().name("voltage").value(getVolt(),3);
         cloud_service.writer().name("verify").value(verifyCount);
         cloud_service.writer().name("reload").value(verifyFail);
-        cloud_service.writer().name("stemp").value((double)stsTemperature, 1);		
+        cloud_service.writer().name("stemp").value((double)stsTemperature, 1);
         cloud_service.writer().name("ttemp").value((double)thTemperature, 1);
         if (publishPMICRegs)
         {
@@ -190,7 +190,7 @@ void TrackerFuelGauge::test()
             }
             cloud_service.writer().endArray();
         }
-        
+
 
         cloud_service.writer().endObject();
 

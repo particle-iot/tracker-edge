@@ -6,7 +6,7 @@ namespace particle
 {
     class IGnssLed
     {
-    public:    
+    public:
         IGnssLed(){};
 
         /**
@@ -22,6 +22,6 @@ namespace particle
         /**
          * @brief set LED off
          */
-        virtual void off() = 0;        
+        virtual void off() = 0;
     };
 }

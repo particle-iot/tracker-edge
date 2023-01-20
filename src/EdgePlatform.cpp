@@ -62,7 +62,7 @@ constexpr uint8_t CURRENT_3_A      = 0b0 << CURRENT_SHIFT;
 //***************** GLOBALS **********************
 EdgePlatform *EdgePlatform::_instance = nullptr;
 
-Logger EdgePlatformLogger("otp");                                                                                      
+Logger EdgePlatformLogger("otp");
 
 void EdgePlatform::init()
 {
@@ -165,7 +165,7 @@ void EdgePlatform::init()
         currentLimit_ = Ilim::eILIM_3;
     }
 
-    // Sensirion sensor type is currently not a field in OTP. However, there may be a field in the future. 
+    // Sensirion sensor type is currently not a field in OTP. However, there may be a field in the future.
     if( TRACKER_MODEL_MONITORONE == info.model ) {
         sensirion_ = EdgePlatform::SensirionType::eSTS31;
     } else {
