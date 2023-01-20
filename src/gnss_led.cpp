@@ -25,11 +25,15 @@ static bool enabled = true;
 static LocationStatus lastStatus_ = { .powered = -1, .locked = -1, .error = -1 };
 static int blinkCount_ = GNSS_LED_CONTROL_BLINK_PERIOD_MS / GNSS_LED_CONTROL_TIMER_PERIOD_MS;
 static bool blinkState_ = false;
+static IGnssLed *pInterface = nullptr;
 
 static void GnssLedTimer() {
 
     if (!enabled) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        if (pInterface)
+        {
+            pInterface->off();
+        }
         lastStatus_ = { .powered = -1, .locked = -1 };
         return;
     }
@@ -46,7 +50,19 @@ static void GnssLedTimer() {
     }
 
     if (status.error) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, (blinkState_) ? LOW : HIGH);
+
+        if (pInterface)
+        {
+            if(blinkState_)
+            {
+                pInterface->on();
+            }
+            else
+            {
+                pInterface->off();
+            }
+        }
+
         blinkState_ = !blinkState_;
         return;
     }
@@ -58,15 +74,32 @@ static void GnssLedTimer() {
     }
 
     if (status.powered == 0) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        if (pInterface)
+        {
+            pInterface->off();
+        }
     }
     else if (status.locked) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, LOW);
+        if (pInterface)
+        {
+            pInterface->on();
+        }
     }
     else {
         if (blinkCount_ == 0) {
             blinkCount_ = GNSS_LED_CONTROL_BLINK_PERIOD_MS / GNSS_LED_CONTROL_TIMER_PERIOD_MS;
-            digitalWrite(TRACKER_GNSS_LOCK_LED, (blinkState_) ? LOW : HIGH);
+
+            if (pInterface)
+            {
+                if(blinkState_)
+                {
+                    pInterface->on();
+                }
+                else
+                {
+                    pInterface->off();
+                }
+            }
             blinkState_ = !blinkState_;
         }
         else {
@@ -76,9 +109,12 @@ static void GnssLedTimer() {
 }
 
 
-int GnssLedInit() {
-    pinMode(TRACKER_GNSS_LOCK_LED, OUTPUT);
-    digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+int GnssLedInit(IGnssLed *pInstance) {
+    pInterface = pInstance;
+    if (pInterface)
+    {
+        pInterface->init();
+    }
     enabled = false;
 
     timer_ = new Timer(GNSS_LED_CONTROL_TIMER_PERIOD_MS, GnssLedTimer);
@@ -94,7 +130,10 @@ int GnssLedInit() {
 void GnssLedEnable(bool enable) {
     enabled = enable;
     if (!enabled) {
-        digitalWrite(TRACKER_GNSS_LOCK_LED, HIGH);
+        if (pInterface)
+        {
+            pInterface->off();
+        }
     }
 }
 

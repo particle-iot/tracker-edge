@@ -14,35 +14,29 @@
  * limitations under the License.
  */
 
-#include "Particle.h"
-#include "tracker_config.h"
-#include "tracker.h"
+#pragma once
 
-SYSTEM_THREAD(ENABLED);
-SYSTEM_MODE(SEMI_AUTOMATIC);
+#include "config_service.h"
+#include "adp8866_rgb.h"
 
-#if TRACKER_PRODUCT_NEEDED
-PRODUCT_ID(TRACKER_PRODUCT_ID);
-#endif // TRACKER_PRODUCT_NEEDED
-PRODUCT_VERSION(TRACKER_PRODUCT_VERSION);
-
-STARTUP(
-    Tracker::startup();
-);
-
-SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
-    { "app.gps.nmea", LOG_LEVEL_INFO },
-    { "app.gps.ubx",  LOG_LEVEL_INFO },
-    { "ncp.at", LOG_LEVEL_INFO },
-    { "net.ppp.client", LOG_LEVEL_INFO },
-});
-
-void setup()
+class TrackerUserRGB
 {
-    Tracker::instance().init();
-}
-
-void loop()
-{
-    Tracker::instance().loop();
-}
+    public:
+        static TrackerUserRGB &instance()
+        {
+            if(!_instance)
+            {
+                _instance = new TrackerUserRGB();
+            }
+            return *_instance;
+        }
+        int init();
+        ADP8866_RGB &get_rgb1_instance();
+        ADP8866_RGB &get_rgb2_instance();
+    private:
+        TrackerUserRGB(){}
+        static TrackerUserRGB *_instance;
+        ADP8866_RGB *pRGB1      = nullptr;
+        ADP8866_RGB *pRGB2      = nullptr;
+        ADP8866 *pAdp8866Drv    = nullptr;
+};

@@ -19,7 +19,23 @@
 #include "Particle.h"
 
 #include "ubloxGPS.h"
+#include "quecGNSS.h"
 
+/**
+ * @brief Number of satellite descriptors to store
+ *
+ */
+constexpr uint32_t NUM_SAT_DESC = 12*NUM_GSV_TYPES*NUM_SAT_BANDS;
+
+/**
+ * @brief GPS module type
+ *
+ */
+enum class GnssModuleType {
+    GNSS_NONE,
+    GNSS_UBLOX,
+    GNSS_QUECTEL,
+};
 
 /**
  * @brief Type of location point structure
@@ -76,6 +92,9 @@ struct LocationPoint {
     float horizontalDop;            /**< Point horizontal dilution of precision */
     float verticalAccuracy;         /**< Point vertical accuracy in meters */
     float verticalDop;              /**< Point vertical dilution of precision */
+    unsigned int satsInUse;         /**< Point satellites in use */
+    unsigned int satsInView;        /**< Point satellites in view */
+    gps_sat_t sats_in_view_desc[NUM_SAT_DESC]; /**< Collection of satellites in view */
 };
 
 /**
@@ -463,7 +482,7 @@ public:
 
 private:
     bool _enableFastLock;
-    
+
     // Untethered Dead Reckoning config
     bool _enableUDR;
     ubx_dynamic_model_t _udrDynamicModel;
@@ -499,6 +518,12 @@ public:
         }
         return *_instance;
     }
+
+    /**
+     * @brief Assign appropriate GNSS module used by this platform
+     *
+     */
+    void setModuleType(void);
 
     /**
      * @brief Initialize the location service
@@ -622,9 +647,7 @@ public:
      * @retval TRUE if locked
      * @retval FALSE if not locked
      */
-    bool isLockStable() {
-        return gps_->isLockStable();
-    }
+    bool isLockStable();
 
     /**
      * @brief Indicate whether the GNSS module is active and sending NMEA/UBX data
@@ -632,9 +655,7 @@ public:
      * @return true Is active
      * @return false Is not active
      */
-    bool isActive() {
-        return gps_->is_active();
-    }; 
+    bool isActive();
 
 private:
 
@@ -681,9 +702,11 @@ private:
     RecursiveMutex pointMutex_;
     uint16_t selectPin_;
     uint16_t enablePin_;
-    ubloxGPS* gps_;
+    ubloxGPS* ubloxGps_;
+    quectelGPS* quecGps_;
     PointThreshold pointThreshold_;
     bool pointThresholdConfigured_;
     bool fastGnssLock_;
     bool enableHotStartOnWake_;
+    GnssModuleType gnssType_;
 };

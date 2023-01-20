@@ -17,83 +17,6 @@
 #pragma once
 
 #include "Particle.h"
-#include <map>
-
-//******************** DEFINES ************************
-
-
-//***************** ENUMERATIONS **********************
-enum class TrackerModel
-{
-    eBARE_SOM_DEFAULT,
-    eBARE_SOM,
-    eEVAL,
-    eTRACKER_ONE,
-    eMONITOR_ONE,
-    eMODEL_INVALID
-}; 
-
-enum class GnssVariant
-{
-    eNEO_M8U,
-    eLC29HBA,
-    eNEO_M9V,
-    eGNSS_INVALID
-};
-
-enum class ImuVariant
-{
-    eBMI160,
-    eBMI270,
-    eIMU_INVALID
-};
-
-enum class GpioExpander
-{
-    eMCP23S17,
-    eEXPANDER_INVALID
-};
-
-enum class CanXcvr
-{
-    eMCP25625,
-    eCAN_INVALID
-};
-
-enum class Ilim
-{
-    eILIM_1_5,
-    eILIM_3,
-    eILIM_INVALID
-};
-
-enum class ThermistorType
-{
-    eSOFTWARE,
-    ePMIC,
-    eTR_INVALID
-};
-
-enum class WiFiVariant
-{
-    eESP32_D2WD,
-    eESP32_U4WDH,
-    eWIFI_INVALID
-};
-
-enum class FuelGaugeType
-{
-    eMAX17043,
-    eFG_INVALID
-};
-
-enum class SensirionType
-{
-    eSHT,
-    eSTS31,
-    eSENSE_INVALID
-};
-
 
 /**
  * @brief Class used to read and parse OTP fields.
@@ -101,6 +24,79 @@ enum class SensirionType
 class EdgePlatform
 {
 public:
+    //***************** ENUMERATIONS **********************
+    enum class TrackerModel
+    {
+        eBARE_SOM_DEFAULT,
+        eBARE_SOM,
+        eEVAL,
+        eTRACKER_ONE,
+        eMONITOR_ONE,
+        eTRACKER_M,
+        eMODEL_INVALID
+    };
+
+    enum class GnssVariant
+    {
+        eNEO_M8U,
+        eLC29HBA,
+        eNEO_M9V,
+        eGNSS_INVALID
+    };
+
+    enum class ImuVariant
+    {
+        eBMI160,
+        eBMI270,
+        eIMU_INVALID
+    };
+
+    enum class GpioExpander
+    {
+        eMCP23S17,
+        eEXPANDER_INVALID
+    };
+
+    enum class CanXcvr
+    {
+        eMCP25625,
+        eCAN_INVALID
+    };
+
+    enum class Ilim
+    {
+        eILIM_1_5,
+        eILIM_3,
+        eILIM_INVALID
+    };
+
+    enum class ThermistorType
+    {
+        eSOFTWARE,
+        ePMIC,
+        eTR_INVALID
+    };
+
+    enum class WiFiVariant
+    {
+        eESP32_D2WD,
+        eESP32_U4WDH,
+        eWIFI_INVALID
+    };
+
+    enum class FuelGaugeType
+    {
+        eMAX17043,
+        eFG_INVALID
+    };
+
+    enum class SensirionType
+    {
+        eSHT,
+        eSTS31,
+        eSENSE_INVALID
+    };
+
     /**
      * @brief Return instance of the LocationService
      *
@@ -116,20 +112,10 @@ public:
     }
 
     /**
-     * @brief Populate lookup tables used by this class
-     *
-     * @retval true Successful
-     * @retval false Failure
-     */
-    bool init();
-
-    /**
      * @brief Read OTP region for hardware information
      *
-     * @retval true Successful
-     * @retval false Failure
      */
-    bool readHwInfo();
+    void init();
 
     /**
      * @brief Return Tracker model type
@@ -220,12 +206,4 @@ private:
     WiFiVariant    wifi_          {WiFiVariant::eWIFI_INVALID};
     FuelGaugeType  fg_            {FuelGaugeType::eFG_INVALID};
     SensirionType  sensirion_     {SensirionType::eSENSE_INVALID};
-
-    std::map<uint32_t,TrackerModel>  modelTable_ {};
-    std::map<uint8_t,GnssVariant>    gnssTable_ {};
-    std::map<uint8_t,ImuVariant>     imuTable_ {};
-    std::map<uint8_t,WiFiVariant>    wifiTable_ {};
-    std::map<uint8_t,Ilim>           currentTable_ {};
-    std::map<uint8_t,ThermistorType> thermistorTable_ {};
 };
-

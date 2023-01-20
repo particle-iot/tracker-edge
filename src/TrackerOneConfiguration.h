@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Particle Industries, Inc.
+ * Copyright (c) 2022 Particle Industries, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,23 @@
 
 #pragma once
 
-#include "location_service.h"
-#include "IGnssLed.h"
+#include "IEdgePlatformConfiguration.h"
+#include "tracker_config.h"
+#include "IoGnssLed.h"
 
-using namespace particle;
+class TrackerOneConfiguration: public IEdgePlatformConfiguration
+{
+public:
+    TrackerOneConfiguration()
+    {
+        commonCfg.chargeCurrentHigh = 1024; // milliamps
+        commonCfg.inputCurrent = 1500; // milliamps
+        commonCfg.pGnssLed = new IoGnssLed(TRACKER_GNSS_LOCK_LED);
+    }
 
-constexpr system_tick_t GNSS_LED_CONTROL_TIMER_PERIOD_MS = 50;
-constexpr system_tick_t GNSS_LED_CONTROL_BLINK_PERIOD_MS = 250;
+    void load_specific_platform_config()
+    {
+    }
+protected:
 
-int GnssLedInit(IGnssLed *pInstance);
-void GnssLedEnable(bool enable);
-void GnssLedError();
+};

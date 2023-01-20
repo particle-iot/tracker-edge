@@ -53,6 +53,7 @@ struct tracker_location_config_t {
     bool wps;
     bool enhance_loc;
     bool loc_cb;
+    bool diag;
 };
 
 enum class Trigger {
@@ -203,6 +204,7 @@ class TrackerLocation
                 .wps = true,
                 .enhance_loc = true,
                 .loc_cb = false,
+                .diag = false,
             };
 
             _config_state_loop_safe = _config_state;

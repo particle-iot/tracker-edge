@@ -20,6 +20,7 @@
 #include "Particle.h"
 #include "tracker_config.h"
 #include "location_service.h"
+#include "EdgePlatform.h"
 
 using namespace spark;
 using namespace particle;
@@ -32,45 +33,86 @@ namespace {
 LocationService *LocationService::_instance = nullptr;
 
 LocationService::LocationService()
-    : gps_(nullptr),
+    : ubloxGps_(nullptr),
+      quecGps_(nullptr),
       pointThreshold_({0}),
       pointThresholdConfigured_(false),
-      fastGnssLock_(false) {
+      fastGnssLock_(false),
+      gnssType_(GnssModuleType::GNSS_NONE) {
 
 }
 
+void LocationService::setModuleType(void)
+{
+    // Parse OTP 'features' area to determine module type
+    if(EdgePlatform::GnssVariant::eLC29HBA == EdgePlatform::instance().getGnss())
+    {
+        gnssType_ = GnssModuleType::GNSS_QUECTEL;
+    }
+    else
+    {
+        gnssType_ = GnssModuleType::GNSS_UBLOX;
+    }
+}
+
 int LocationService::begin(const LocationServiceConfiguration& config) {
-    _deviceConfig = config;
-
-    CHECK_FALSE(gps_, SYSTEM_ERROR_INVALID_STATE);
-
-    pinMode(UBLOX_CS_PIN, OUTPUT);
-    pinMode(UBLOX_PWR_EN_PIN, OUTPUT);
-    pinMode(UBLOX_RESETN_PIN, OUTPUT);
-    digitalWrite(UBLOX_RESETN_PIN, LOW);
-
-    CHECK_TRUE(assertEnable(false), SYSTEM_ERROR_IO);
-    CHECK_TRUE(assertSelect(false), SYSTEM_ERROR_IO);
-
-    selectPin_ = UBLOX_CS_PIN;
-    enablePin_ = UBLOX_PWR_EN_PIN;
 
     int ret = SYSTEM_ERROR_NONE;
 
-    do {
-        gps_ = new ubloxGPS(UBLOX_SPI_INTERFACE,
-                            std::bind(&LocationService::assertSelect, this, _1),
-                            std::bind(&LocationService::assertEnable, this, _1),
-                            UBLOX_TX_READY_MCU_PIN,
-                            UBLOX_TX_READY_GPS_PIN);
-        if (!gps_) {
-            Log.error("ubloxGPS instantiation failed");
-            ret = SYSTEM_ERROR_INTERNAL;
-            break;
-        }
+    // Assign the GNSS hardware variant
+    setModuleType();
 
-        return SYSTEM_ERROR_NONE;
-    } while (false);
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        _deviceConfig = config;
+
+        CHECK_FALSE(ubloxGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        pinMode(UBLOX_CS_PIN, OUTPUT);
+        pinMode(UBLOX_PWR_EN_PIN, OUTPUT);
+        pinMode(UBLOX_RESETN_PIN, OUTPUT);
+        digitalWrite(UBLOX_RESETN_PIN, LOW);
+
+        CHECK_TRUE(assertEnable(false), SYSTEM_ERROR_IO);
+        CHECK_TRUE(assertSelect(false), SYSTEM_ERROR_IO);
+
+        selectPin_ = UBLOX_CS_PIN;
+        enablePin_ = UBLOX_PWR_EN_PIN;
+
+        do {
+            ubloxGps_ = new ubloxGPS(UBLOX_SPI_INTERFACE,
+                                std::bind(&LocationService::assertSelect, this, _1),
+                                std::bind(&LocationService::assertEnable, this, _1),
+                                UBLOX_TX_READY_MCU_PIN,
+                                UBLOX_TX_READY_GPS_PIN);
+            if (!ubloxGps_) {
+                Log.error("ubloxGPS instantiation failed");
+                ret = SYSTEM_ERROR_INTERNAL;
+                break;
+            }
+
+            return SYSTEM_ERROR_NONE;
+        } while (false);
+    }
+    else
+    {
+        CHECK_FALSE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        do {
+            quecGps_ = new quectelGPS(QUECTEL_GNSS_I2C_INTERFACE, QUECTEL_GNSS_PWR_EN_PIN,
+                                      QUECTEL_GNSS_WAKEUP_PIN);
+            if (!quecGps_) {
+                Log.error("quectelGPS instantiation failed");
+                ret = SYSTEM_ERROR_INTERNAL;
+                break;
+            }
+
+            // Initialize properties of GNSS module
+            quecGps_->quectelDevInit();
+
+            return SYSTEM_ERROR_NONE;
+        } while (false);
+    }
 
     // Cleanup
     cleanup();
@@ -79,25 +121,44 @@ int LocationService::begin(const LocationServiceConfiguration& config) {
 }
 
 void LocationService::cleanup() {
-    if (gps_) {
-        delete gps_;
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        if (ubloxGps_) {
+            delete ubloxGps_;
+        }
+    }
+    else
+    {
+        if (quecGps_) {
+            delete quecGps_;
+        }
     }
 }
 
 void LocationService::setFastLock(bool enable) {
-    if (gps_) {
-        if (enable) {
-            gps_->setLockMethod(ubloxGpsLockMethod::HorizontalDop);
-            gps_->setLockHdopThreshold(LOCATION_LOCK_HDOP_MAX_DEFAULT);
-        } else {
-            gps_->setLockMethod(ubloxGpsLockMethod::HorizontalAccuracy);
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        if (ubloxGps_) {
+            if (enable) {
+                ubloxGps_->setLockMethod(ubloxGpsLockMethod::HorizontalDop);
+                ubloxGps_->setLockHdopThreshold(LOCATION_LOCK_HDOP_MAX_DEFAULT);
+            } else {
+                ubloxGps_->setLockMethod(ubloxGpsLockMethod::HorizontalAccuracy);
+            }
         }
     }
 }
 
 bool LocationService::getFastLock() {
-    if (gps_) {
-        return (ubloxGpsLockMethod::HorizontalDop == gps_->getLockMethod());
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        if (ubloxGps_) {
+            return (ubloxGpsLockMethod::HorizontalDop == ubloxGps_->getLockMethod());
+        }
+    }
+    else
+    {
+        return true;
     }
 
     return false;
@@ -105,62 +166,86 @@ bool LocationService::getFastLock() {
 
 bool LocationService::configureGPS(LocationServiceConfiguration& config) {
     enableHotStartOnWake_ = config.enableHotStartOnWake();
-    
+
     bool ret = true;
-    
-    WITH_LOCK(*gps_) {
+
+    WITH_LOCK(*ubloxGps_) {
         setFastLock(_deviceConfig.enableFastLock());
-        ret &= gps_->setMode(_deviceConfig.udrModel());
-        ret &= gps_->setIMUAlignmentAngles(
+        ret &= ubloxGps_->setMode(_deviceConfig.udrModel());
+        ret &= ubloxGps_->setIMUAlignmentAngles(
             _deviceConfig.imuYaw(),
             _deviceConfig.imuPitch(),
             _deviceConfig.imuRoll()
         );
-        ret &= gps_->setIMUAutoAlignment(_deviceConfig.enableIMUAutoAlignment());
-        ret &= gps_->setUDREnable(_deviceConfig.enableUDR());
-        ret &= gps_->setIMUtoVRP(
+        ret &= ubloxGps_->setIMUAutoAlignment(_deviceConfig.enableIMUAutoAlignment());
+        ret &= ubloxGps_->setUDREnable(_deviceConfig.enableUDR());
+        ret &= ubloxGps_->setIMUtoVRP(
             _deviceConfig.imuToVRPX(),
             _deviceConfig.imuToVRPY(),
-            _deviceConfig.imuToVRPZ()    
+            _deviceConfig.imuToVRPZ()
         );
-        ret &= gps_->setAOPSettings(_deviceConfig.enableAssistNowAutonomous());
+        ret &= ubloxGps_->setAOPSettings(_deviceConfig.enableAssistNowAutonomous());
     }
     return ret;
 }
 
 int LocationService::start(bool restart) {
-    CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        CHECK_TRUE(ubloxGps_, SYSTEM_ERROR_INVALID_STATE);
 
-    if (restart && gps_->isOn()) {
-        if (enableHotStartOnWake_) {
-            CHECK_TRUE(gps_->saveOnShutdown(), SYSTEM_ERROR_INVALID_STATE);
+        if (restart && ubloxGps_->isOn()) {
+            if (enableHotStartOnWake_) {
+                CHECK_TRUE(ubloxGps_->saveOnShutdown(), SYSTEM_ERROR_INVALID_STATE);
+            }
+            ubloxGps_->off();
         }
-        gps_->off();
+
+        if (!ubloxGps_->isOn()) {
+            auto ret = ubloxGps_->on();
+            if (ret) {
+                Log.error("Error %d when turning GNSS on", ret);
+                return ret;
+            }
+            Log.info("GNSS Start");
+            CHECK_TRUE(configureGPS(_deviceConfig), SYSTEM_ERROR_INVALID_STATE);
+        }
     }
+    else
+    {
+        CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
 
-    if (!gps_->isOn()) {
-        auto ret = gps_->on();
-        if (ret) {
-            Log.error("Error %d when turning GNSS on", ret);
-            return ret;
-        }
-        Log.info("GNSS Start");
-        CHECK_TRUE(configureGPS(_deviceConfig), SYSTEM_ERROR_INVALID_STATE);
+        // Unconditionally turn on the GNSS module and start polling for GPS data
+        quecGps_->quectelModulePower(true);
+        quecGps_->quectelStart();
     }
 
     return SYSTEM_ERROR_NONE;
 }
 
 int LocationService::stop() {
-    CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
     int ret = SYSTEM_ERROR_NONE;
 
-    if (gps_->isOn()) {
-        Log.info("Turning GNSS off");
-        if (enableHotStartOnWake_) {
-            CHECK_TRUE(gps_->saveOnShutdown(), SYSTEM_ERROR_INVALID_STATE);
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        CHECK_TRUE(ubloxGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        if (ubloxGps_->isOn()) {
+            Log.info("Turning GNSS off");
+            if (enableHotStartOnWake_) {
+                CHECK_TRUE(ubloxGps_->saveOnShutdown(), SYSTEM_ERROR_INVALID_STATE);
+            }
+            ret = ubloxGps_->off();
         }
-        ret = gps_->off();
+    }
+    else
+    {
+        CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        // Unconditionally turn off the GNSS module
+        Log.info("Turning GNSS off");
+        quecGps_->quectelSaveLocationData();
+        quecGps_->quectelModulePower(false);
     }
 
     return ret;
@@ -170,22 +255,50 @@ int LocationService::getLocation(LocationPoint& point) {
     point.type = LocationType::DEVICE;
     point.sources.append(LocationSource::GNSS);
 
-    WITH_LOCK(*gps_) {
-        point.locked = (gps_->getLock()) ? 1 : 0;
-        point.stable = gps_->isLockStable();
-        point.lockedDuration = gps_->getLockDuration();
-        point.epochTime = (time_t)gps_->getUTCTime();
-        point.timeScale = LocationTimescale::TIMESCALE_UTC;
-        if (point.locked) {
-            point.latitude = gps_->getLatitude();
-            point.longitude = gps_->getLongitude();
-            point.altitude = gps_->getAltitude();
-            point.speed = gps_->getSpeed(GPS_SPEED_UNIT_MPS);
-            point.heading = gps_->getHeading();
-            point.horizontalAccuracy = gps_->getHorizontalAccuracy();
-            point.horizontalDop = gps_->getHDOP();
-            point.verticalAccuracy = gps_->getVerticalAccuracy();
-            point.verticalDop = gps_->getVDOP();
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        WITH_LOCK(*ubloxGps_) {
+            point.locked = (ubloxGps_->getLock()) ? 1 : 0;
+            point.stable = ubloxGps_->isLockStable();
+            point.lockedDuration = ubloxGps_->getLockDuration();
+            point.epochTime = (time_t)ubloxGps_->getUTCTime();
+            point.timeScale = LocationTimescale::TIMESCALE_UTC;
+            point.satsInUse = ubloxGps_->getSatellites();
+            point.satsInView = ubloxGps_->getSatellitesDesc(point.sats_in_view_desc);
+            if (point.locked) {
+                point.latitude = ubloxGps_->getLatitude();
+                point.longitude = ubloxGps_->getLongitude();
+                point.altitude = ubloxGps_->getAltitude();
+                point.speed = ubloxGps_->getSpeed(GPS_SPEED_UNIT_MPS);
+                point.heading = ubloxGps_->getHeading();
+                point.horizontalAccuracy = ubloxGps_->getHorizontalAccuracy();
+                point.horizontalDop = ubloxGps_->getHDOP();
+                point.verticalAccuracy = ubloxGps_->getVerticalAccuracy();
+                point.verticalDop = ubloxGps_->getVDOP();
+            }
+        }
+    }
+    else
+    {
+        WITH_LOCK(*quecGps_) {
+            point.locked = (quecGps_->getLock()) ? 1 : 0;
+            point.stable = quecGps_->isLockStable();
+            point.lockedDuration = quecGps_->getLockDuration();
+            point.epochTime = (time_t)quecGps_->getUTCTime();
+            point.timeScale = LocationTimescale::TIMESCALE_UTC;
+            point.satsInUse = quecGps_->getSatellites();
+            point.satsInView = quecGps_->getSatellitesDesc(point.sats_in_view_desc);
+            if (point.locked) {
+                point.latitude = quecGps_->getLatitude();
+                point.longitude = quecGps_->getLongitude();
+                point.altitude = quecGps_->getAltitude();
+                point.speed = quecGps_->getSpeed((uint8_t)gpsSpeedUnit::GPS_SPEED_UNIT_MPS);
+                point.heading = quecGps_->getHeading();
+                point.horizontalAccuracy = quecGps_->getHorizontalAccuracy();
+                point.horizontalDop = quecGps_->getHDOP();
+                point.verticalAccuracy = quecGps_->getVerticalAccuracy();
+                point.verticalDop = quecGps_->getVDOP();
+            }
         }
     }
 
@@ -228,29 +341,54 @@ int LocationService::getWayPoint(PointThreshold& point) {
 }
 
 int LocationService::getDistance(float& distance, const PointThreshold& wayPoint, const LocationPoint& point) {
-    CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
     CHECK_TRUE(pointThresholdConfigured_, SYSTEM_ERROR_INVALID_STATE);
 
-    distance = fabs(gps_->getDistance(
-        wayPoint.latitude, wayPoint.longitude,
-        point.latitude, point.longitude));
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        CHECK_TRUE(ubloxGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        distance = fabs(ubloxGps_->getDistance(
+            wayPoint.latitude, wayPoint.longitude,
+            point.latitude, point.longitude));
+    }
+    else
+    {
+        CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        distance = fabs(quecGps_->getDistance(
+            wayPoint.latitude, wayPoint.longitude,
+            point.latitude, point.longitude));
+    }
 
     return SYSTEM_ERROR_NONE;
 }
 
 int LocationService::isOutsideRadius(bool& outside, const LocationPoint& point) {
-    CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
     CHECK_TRUE(pointThresholdConfigured_, SYSTEM_ERROR_INVALID_STATE);
 
+    float distance;
     PointThreshold current;
     getWayPoint(current);
 
-    float distance = fabs(gps_->getDistance(
-        current.latitude, current.longitude,
-        point.latitude, point.longitude));
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        CHECK_TRUE(ubloxGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        distance = fabs(ubloxGps_->getDistance(
+            current.latitude, current.longitude,
+            point.latitude, point.longitude));
+    }
+    else
+    {
+        CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
+
+        distance = fabs(quecGps_->getDistance(
+            current.latitude, current.longitude,
+            point.latitude, point.longitude));
+    }
 
     if (distance > current.radius) {
-        outside = true;
+            outside = true;
     } else {
         outside = false;
     }
@@ -259,44 +397,105 @@ int LocationService::isOutsideRadius(bool& outside, const LocationPoint& point) 
 }
 
 int LocationService::getStatus(LocationStatus& status) {
-    CHECK_TRUE(gps_, SYSTEM_ERROR_INVALID_STATE);
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        CHECK_TRUE(ubloxGps_, SYSTEM_ERROR_INVALID_STATE);
 
-    auto gpsState = gps_->getGpsStatus();
+        auto gpsState = ubloxGps_->getGpsStatus();
 
-    switch (gpsState) {
-        case GPS_STATUS_OFF: {
-            status.locked = 0;
-            status.powered = 0;
-            status.error = 0;
-            break;
+        switch (gpsState) {
+            case GPS_STATUS_OFF: {
+                status.locked = 0;
+                status.powered = 0;
+                status.error = 0;
+                break;
+            }
+
+            case GPS_STATUS_FIXING: {
+                status.locked = 0;
+                status.powered = 1;
+                status.error = 0;
+                break;
+            }
+
+            case GPS_STATUS_LOCK: {
+                status.locked = 1;
+                status.powered = 1;
+                status.error = 0;
+                break;
+            }
+
+            case GPS_STATUS_ERROR: {
+                status.locked = 0;
+                status.powered = 0;
+                status.error = 1;
+                break;
+            }
+
+            default: break;
         }
+    }
+    else
+    {
+        CHECK_TRUE(quecGps_, SYSTEM_ERROR_INVALID_STATE);
 
-        case GPS_STATUS_FIXING: {
-            status.locked = 0;
-            status.powered = 1;
-            status.error = 0;
-            break;
+        auto gpsState = quecGps_->getGpsStatus();
+
+        switch ((gpsLedStatus)gpsState) {
+            case gpsLedStatus::GPS_STATUS_OFF: {
+                status.locked = 0;
+                status.powered = 0;
+                status.error = 0;
+                break;
+            }
+
+            case gpsLedStatus::GPS_STATUS_FIXING: {
+                status.locked = 0;
+                status.powered = 1;
+                status.error = 0;
+                break;
+            }
+
+            case gpsLedStatus::GPS_STATUS_LOCK: {
+                status.locked = 1;
+                status.powered = 1;
+                status.error = 0;
+                break;
+            }
+
+            case gpsLedStatus::GPS_STATUS_ERROR: {
+                status.locked = 0;
+                status.powered = 0;
+                status.error = 1;
+                break;
+            }
+
+            default: break;
         }
-
-        case GPS_STATUS_LOCK: {
-            status.locked = 1;
-            status.powered = 1;
-            status.error = 0;
-            break;
-        }
-
-        case GPS_STATUS_ERROR: {
-            status.locked = 0;
-            status.powered = 0;
-            status.error = 1;
-            break;
-        }
-
-        default: break;
     }
 
     return SYSTEM_ERROR_NONE;
 }
+
+bool LocationService::isLockStable() {
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        return ubloxGps_->isLockStable();
+    }
+    else
+    {
+        return quecGps_->isLockStable();
+    }
+}
+
+bool LocationService::isActive() {
+    if( GnssModuleType::GNSS_UBLOX == gnssType_ )
+    {
+        return ubloxGps_->is_active();
+    }
+
+    return false;
+};
 
 bool LocationService::assertSelect(bool select)
 {

@@ -132,6 +132,10 @@ void TrackerLocation::init(unsigned int gnssRetries)
                 config_get_bool_cb, config_set_bool_cb,
                 &_config_state.loc_cb, &_config_state_shadow.loc_cb
             ),
+            ConfigBool("satdiag",
+                config_get_bool_cb, config_set_bool_cb,
+                &_config_state.diag, &_config_state_shadow.diag
+            ),
         },
         std::bind(&TrackerLocation::enter_location_config_cb, this, _1, _2),
         std::bind(&TrackerLocation::exit_location_config_cb, this, _1, _2, _3)
@@ -866,6 +870,34 @@ void TrackerLocation::buildPublish(LocationPoint& cur_loc, bool error) {
     }
     else {
         cloud_service.writer().name("lck").value(0);
+    }
+
+    // Collect satellite information for debugging.  This is not dependent on lock state so as to
+    // debug situations with poor constellation signal strength
+    if (_config_state_loop_safe.diag) {
+        cloud_service.writer().name("satu").value(cur_loc.satsInUse);
+        cloud_service.writer().name("satv").value(cur_loc.satsInView);
+
+        // Collect local statistics for the most recent reported constellations
+        uint8_t min {UINT8_MAX};
+        uint8_t max {};
+        float mean {};
+        unsigned int i {};
+        for (; i < cur_loc.satsInView; i++) {
+            auto value = cur_loc.sats_in_view_desc[i].snr;
+            mean += (float)value;
+            min = std::min<uint8_t>(min, value);
+            max = std::max<uint8_t>(max, value);
+        }
+        // Don't divide by zero
+        if (i) {
+            mean /= i;
+            round(mean);
+        }
+
+        cloud_service.writer().name("satmin").value((unsigned)min);
+        cloud_service.writer().name("satmax").value((unsigned)max);
+        cloud_service.writer().name("satmean").value((unsigned)mean);
     }
 
     for(auto cb : locGenCallbacks) {
