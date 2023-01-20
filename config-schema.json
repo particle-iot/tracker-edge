@@ -151,6 +151,17 @@
 					"examples": [
 						true
 					]
+				},
+				"satdiag": {
+					"$id": "#/properties/location/properties/diag",
+					"type": "boolean",
+					"title": "Publish extra information to assist with debugging GNSS",
+					"description": "If enabled, publish GNSS constellation counts and C/NO characteristics.",
+					"default": false,
+					"minimumFirmwareVersion": 19,
+					"examples": [
+						true
+					]
 				}
 			}
 		},
