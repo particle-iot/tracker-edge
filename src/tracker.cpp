@@ -24,6 +24,7 @@
 #include "tracker_fuelgauge.h"
 #include "TrackerOneConfiguration.h"
 #include "TrackerMConfiguration.h"
+#include "TrackerEvalConfiguration.h"
 
 void ctrl_request_custom_handler(ctrl_request* req)
 {
@@ -464,6 +465,7 @@ void Tracker::onSleepPrepare(TrackerSleepContext context)
     configService.flush();
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE:
+        case TRACKER_MODEL_EVAL:
         // Fall through
         case TRACKER_MODEL_MONITORONE: {
             TrackerSleep::instance().wakeAtSeconds(System.uptime() + _commonCfgData.lowBatterySleepWakeInterval);
@@ -586,6 +588,10 @@ int Tracker::init()
             break;
         case EdgePlatform::TrackerModel::eTRACKER_M:
             _platformConfig = new TrackerMConfiguration();
+            _commonCfgData = _platformConfig->get_common_config_data();
+            break;
+        case EdgePlatform::TrackerModel::eEVAL:
+            _platformConfig = new TrackerEvalConfiguration();
             _commonCfgData = _platformConfig->get_common_config_data();
             break;
     }
@@ -714,6 +720,8 @@ void Tracker::loop()
         case TRACKER_MODEL_MONITORONE:{
             evaluateBatteryCharge();
         }
+        // Fall through
+        case TRACKER_MODEL_EVAL:
         break;
     }
 
