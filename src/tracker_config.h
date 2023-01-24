@@ -65,7 +65,7 @@
 #elif (PLATFORM_ID == PLATFORM_TRACKERM)
     #define BMI_SPI_INTERFACE                 (SPI)
     #define BMI_SPI_CS_PIN                    (Y3)
-    #define BMI_INT_PIN                       (IO_EXP_B1)
+    #define BMI_INT_PIN                       (IO_EXP_B0)
 #endif
 #define BMI_INT_MODE                          (FALLING)
 
