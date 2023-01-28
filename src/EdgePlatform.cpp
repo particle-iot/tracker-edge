@@ -66,7 +66,6 @@ Logger EdgePlatformLogger("otp");
 
 void EdgePlatform::init()
 {
-#if (PLATFORM_ID == PLATFORM_TRACKER)
     hal_device_hw_info info;
     uint32_t           res;
 
@@ -78,6 +77,7 @@ void EdgePlatform::init()
     uint8_t byte2 = info.features & 0xFF;
     uint8_t byte3 = info.features >> 8;
 
+#if (PLATFORM_ID == PLATFORM_TRACKER)
     // Parse OTP area to determine module type
     switch (info.model) {
     case TRACKER_MODEL_BARE_SOM:
@@ -175,7 +175,16 @@ void EdgePlatform::init()
     // Tracker-M is fixed with these peripherals
     model_ = EdgePlatform::TrackerModel::eTRACKER_M;
     gnss_ = EdgePlatform::GnssVariant::eLC29HBA;
-    imu_  = EdgePlatform::ImuVariant::eBMI270;
+
+    switch (byte2 & IMU_MASK) {
+    case IMU_BMI160:
+        imu_ = EdgePlatform::ImuVariant::eBMI160;
+        break;
+    case IMU_BMI270:
+        imu_ = EdgePlatform::ImuVariant::eBMI270;
+        break;
+    }
+
     fg_ = EdgePlatform::FuelGaugeType::eMAX17043;
     sensirion_ = EdgePlatform::SensirionType::eSTS31;
 #endif
