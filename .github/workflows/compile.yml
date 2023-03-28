@@ -1,0 +1,25 @@
+name: Compile
+
+on: [push]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Compile application
+        id: compile
+        uses: particle-iot/compile-action@main
+        with:
+          particle-platform-name: 'tracker'
+          sources-folder: '.'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tracker-firmware
+          path: ${{ steps.compile.outputs.artifact-path }}
