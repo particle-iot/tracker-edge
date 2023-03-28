@@ -25,5 +25,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: tracker-firmware
+          name: tracker-firmware-deviceos-${{ matrix.device-os-version }}
           path: ${{ steps.compile.outputs.artifact-path }}
