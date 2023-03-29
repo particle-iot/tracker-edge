@@ -1,0 +1,29 @@
+name: Compile
+
+on: [push]
+
+jobs:
+  compile:
+    strategy:
+      matrix:
+        device-os-version: [ '3.3.0', '4.0.2', '5.3.0' ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Compile application
+        id: compile
+        uses: particle-iot/compile-action@main
+        with:
+          particle-platform-name: 'tracker'
+          device-os-version: '${{ matrix.device-os-version }}'
+          sources-folder: '.'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tracker-firmware-deviceos-${{ matrix.device-os-version }}
+          path: ${{ steps.compile.outputs.artifact-path }}
