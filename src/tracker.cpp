@@ -603,6 +603,10 @@ int Tracker::init()
     BLE.selectAntenna(BleAntennaType::EXTERNAL);
     initBatteryMonitor();
 
+    cloudService.init();
+
+    configService.init();
+
     // Setup device monitoring configuration here
     static ConfigObject deviceMonitoringDesc
     (
@@ -612,11 +616,7 @@ int Tracker::init()
         }
     );
 
-    ConfigService::instance().registerModule(deviceMonitoringDesc);
-
-    cloudService.init();
-
-    configService.init();
+    configService.registerModule(deviceMonitoringDesc);
 
     sleep.init([this](bool enable){ this->enableWatchdog(enable); });
     sleep.registerSleepPrepare([this](TrackerSleepContext context){ this->onSleepPrepare(context); });
