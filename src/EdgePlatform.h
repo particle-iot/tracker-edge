@@ -37,15 +37,12 @@ public:
     enum class GnssVariant
     {
         eNEO_M8U,
-        eLC29HBA,
-        eNEO_M9V,
         eGNSS_INVALID
     };
 
     enum class ImuVariant
     {
         eBMI160,
-        eBMI270,
         eIMU_INVALID
     };
 

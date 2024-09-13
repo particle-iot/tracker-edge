@@ -34,9 +34,6 @@
 [submodule "lib/sensirion"]
 	path = lib/sensirion
 	url = https://github.com/particle-iot/sensirion.git
-[submodule "lib/gps-quectel"]
-	path = lib/gps-quectel
-	url = https://github.com/particle-iot/gps-quectel
 [submodule "lib/debounce-switch"]
 	path = lib/debounce-switch
 	url = https://github.com/rickkas7/DebounceSwitchRK.git

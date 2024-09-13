@@ -22,7 +22,6 @@ namespace particle {
 
 enum class BmiVariant {
     IMU_BMI160,
-    IMU_BMI270,
     IMU_INVALID
 };
 

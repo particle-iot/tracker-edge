@@ -113,20 +113,11 @@ void EdgePlatform::init()
     case IMU_BMI160:
         imu_ = ImuVariant::eBMI160;
         break;
-    case IMU_BMI270:
-        imu_ = ImuVariant::eBMI270;
-        break;
     }
 
     switch (byte2 & GNSS_MASK) {
     case GNSS_NEO_M8U:
         gnss_ = GnssVariant::eNEO_M8U;
-        break;
-    case GNSS_LC29HBA:
-        gnss_ = GnssVariant::eLC29HBA;
-        break;
-    case GNSS_NEO_M9V:
-        gnss_ = GnssVariant::eNEO_M9V;
         break;
     }
 

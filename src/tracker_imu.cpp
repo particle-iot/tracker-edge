@@ -20,7 +20,6 @@
 #include "tracker_imu.h"
 #include "EdgePlatform.h"
 #include "bmi160.h"
-#include "imu_bmi270.h"
 
 
 //***************** DEFINES **********************
@@ -52,9 +51,6 @@ BmiVariant TrackerImu::getImuType(void)
         case EdgePlatform::ImuVariant::eBMI160:
             imu_ = BmiVariant::IMU_BMI160;
             break;
-        case EdgePlatform::ImuVariant::eBMI270:
-            imu_ = BmiVariant::IMU_BMI270;
-            break;
         default:
             imu_ = BmiVariant::IMU_INVALID;
             break;
@@ -76,11 +72,6 @@ int TrackerImu::begin(const TwoWire* interface, uint8_t address, pin_t interrupt
             return BMI160.begin(interface, address, interruptPin, eventDepth);
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.begin(interface, address, interruptPin, eventDepth);
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -96,11 +87,6 @@ int TrackerImu::begin(const SPIClass& interface, pin_t selectPin, pin_t interrup
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.begin(interface, selectPin, interruptPin, eventDepth);
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.begin(interface, selectPin, interruptPin, eventDepth);
             break;
         }
     }
@@ -120,11 +106,6 @@ int TrackerImu::end()
             return BMI160.end();
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.end();
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -139,11 +120,6 @@ int TrackerImu::reset()
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.reset();
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.reset();
             break;
         }
     }
@@ -162,11 +138,6 @@ int TrackerImu::sleep()
             return BMI160.sleep();
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.sleep();
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -183,11 +154,6 @@ int TrackerImu::wakeup()
             return BMI160.wakeup();
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.wakeup();
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -202,11 +168,6 @@ int TrackerImu::syncEvent(BmiEventType event)
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.syncEvent(static_cast<Bmi160::Bmi160EventType>(event));
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.syncEvent(static_cast<Bmi270::Bmi270EventType>(event));
             break;
         }
     }
@@ -228,14 +189,6 @@ int TrackerImu::waitOnEvent(BmiEventType& event, system_tick_t timeout)
             return status;
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            Bmi270::Bmi270EventType evt270;
-            auto status = BMI270.waitOnEvent(evt270, timeout);
-            event = static_cast<BmiEventType>(evt270);
-            return status;
-            break;
-        }
     }
 
     return SYSTEM_ERROR_NONE;
@@ -253,14 +206,6 @@ int TrackerImu::initAccelerometer(BmiAccelerometerConfig& config, bool feedback)
             cfg160.rate = config.rate;
             cfg160.range = config.range;
             return BMI160.initAccelerometer(cfg160, feedback);
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            Bmi270AccelerometerConfig cfg270{0};
-            cfg270.rate = config.rate;
-            cfg270.range = config.range;
-            return BMI270.initAccelerometer(cfg270, feedback);
             break;
         }
     }
@@ -284,16 +229,6 @@ int TrackerImu::getAccelerometer(BmiAccelerometer& data)
             return retval;
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            Bmi270Accelerometer data270{0};
-            auto retval = BMI270.getAccelerometer(data270);
-            data.x = data270.x;
-            data.y = data270.y;
-            data.z = data270.z;
-            return retval;
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -310,14 +245,6 @@ int TrackerImu::getAccelerometerPmu(BmiPowerState& pmu)
             Bmi160::Bmi160PowerState data160{0};
             auto retval = BMI160.getAccelerometerPmu(data160);
             pmu = (BmiPowerState)data160;
-            return retval;
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            Bmi270::Bmi270PowerState data270{0};
-            auto retval = BMI270.getAccelerometerPmu(data270);
-            pmu = (BmiPowerState)data270;
             return retval;
             break;
         }
@@ -343,17 +270,6 @@ int TrackerImu::initMotion(BmiAccelMotionConfig& config, bool feedback)
             return BMI160.initMotion(cfg160, feedback);
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            Bmi270AccelMotionConfig cfg270{};
-            cfg270.mode            = (Bmi270AccelMotionMode)config.mode;
-            cfg270.motionDuration  = config.motionDuration;
-            cfg270.motionProof     = (Bmi270AccelSignificantMotionProof)config.motionProof;
-            cfg270.motionSkip      = (Bmi270AccelSignificantMotionSkip)config.motionSkip;
-            cfg270.motionThreshold = config.motionThreshold;
-            return BMI270.initMotion(cfg270, feedback);
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -374,15 +290,6 @@ int TrackerImu::initHighG(BmiAccelHighGConfig& config, bool feedback)
             return BMI160.initHighG(cfg160, feedback);
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            Bmi270AccelHighGConfig cfg270{};
-            cfg270.duration   = config.duration;
-            cfg270.hysteresis = config.hysteresis;
-            cfg270.threshold  = config.threshold;
-            return BMI270.initHighG(cfg270, feedback);
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -397,11 +304,6 @@ int TrackerImu::startMotionDetect()
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.startMotionDetect();
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.startMotionDetect();
             break;
         }
     }
@@ -420,11 +322,6 @@ int TrackerImu::stopMotionDetect()
             return BMI160.stopMotionDetect();
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.stopMotionDetect();
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -439,11 +336,6 @@ int TrackerImu::startHighGDetect()
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.startHighGDetect();
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.startHighGDetect();
             break;
         }
     }
@@ -462,11 +354,6 @@ int TrackerImu::stopHighGDetect()
             return BMI160.stopHighGDetect();
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.stopHighGDetect();
-            break;
-        }
     }
 
     return SYSTEM_ERROR_INVALID_STATE;
@@ -481,11 +368,6 @@ int  TrackerImu::getStatus(uint32_t& val, bool clear)
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.getStatus(val, clear);
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.getStatus(val, clear);
             break;
         }
     }
@@ -504,11 +386,6 @@ bool TrackerImu::isMotionDetect(uint32_t val)
             return BMI160.isMotionDetect(val);
             break;
         }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.isMotionDetect(val);
-            break;
-        }
     }
 
     return false;
@@ -523,11 +400,6 @@ bool TrackerImu::isHighGDetect(uint32_t val)
         case BmiVariant::IMU_BMI160:
         {
             return BMI160.isHighGDetect(val);
-            break;
-        }
-        case BmiVariant::IMU_BMI270:
-        {
-            return BMI270.isHighGDetect(val);
             break;
         }
     }

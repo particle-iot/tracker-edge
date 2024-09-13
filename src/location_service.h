@@ -19,7 +19,6 @@
 #include "Particle.h"
 
 #include "ubloxGPS.h"
-#include "quecGNSS.h"
 
 /**
  * @brief Number of satellite descriptors to store
@@ -34,7 +33,6 @@ constexpr uint32_t NUM_SAT_DESC = 12*NUM_GSV_TYPES*NUM_SAT_BANDS;
 enum class GnssModuleType {
     GNSS_NONE,
     GNSS_UBLOX,
-    GNSS_QUECTEL,
 };
 
 /**
@@ -703,7 +701,6 @@ private:
     uint16_t selectPin_;
     uint16_t enablePin_;
     ubloxGPS* ubloxGps_;
-    quectelGPS* quecGps_;
     PointThreshold pointThreshold_;
     bool pointThresholdConfigured_;
     bool fastGnssLock_;
