@@ -85,13 +85,6 @@ public:
         eFG_INVALID
     };
 
-    enum class SensirionType
-    {
-        eSHT,
-        eSTS31,
-        eSENSE_INVALID
-    };
-
     /**
      * @brief Return instance of the LocationService
      *
@@ -175,13 +168,6 @@ public:
      */
     FuelGaugeType getFuelGaugeType() const;
 
-    /**
-     * @brief Return Sensirion sensory type
-     *
-     * @return SensirionType
-     */
-    SensirionType getSensirionType() const;
-
 private:
     /**
      * Create a new Tracker Platform object
@@ -200,5 +186,4 @@ private:
     ThermistorType tr_            {ThermistorType::eTR_INVALID};
     WiFiVariant    wifi_          {WiFiVariant::eWIFI_INVALID};
     FuelGaugeType  fg_            {FuelGaugeType::eFG_INVALID};
-    SensirionType  sensirion_     {SensirionType::eSENSE_INVALID};
 };

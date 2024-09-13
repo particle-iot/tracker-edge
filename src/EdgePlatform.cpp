@@ -153,8 +153,6 @@ void EdgePlatform::init()
         currentLimit_ = Ilim::eILIM_3;
     }
 
-    // Sensirion sensor type is currently not a field in OTP. However, there may be a field in the future.
-    sensirion_ = EdgePlatform::SensirionType::eSENSE_INVALID;
 #endif
 
     // Flag the initialization as complete
@@ -222,11 +220,4 @@ EdgePlatform::FuelGaugeType EdgePlatform::getFuelGaugeType() const
     CHECK_TRUE(isInitialized_, FuelGaugeType::eFG_INVALID);
 
     return fg_;
-}
-
-EdgePlatform::SensirionType EdgePlatform::getSensirionType() const
-{
-    CHECK_TRUE(isInitialized_, SensirionType::eSENSE_INVALID);
-
-    return sensirion_;
 }

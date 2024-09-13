@@ -16,7 +16,6 @@
 
 #include <atomic>
 #include "EdgePlatform.h"
-#include "Sts3x.h"
 #include "thermistor.h"
 #include "temperature.h"
 #include "tracker_sleep.h"
@@ -87,7 +86,6 @@ enum class TempChargeState {
 
 
 static Thermistor _thermistor;
-static Sts3x _sts(Wire, Sts3x::AddrA, PIN_INVALID);
 static TemperatureCallback _eventCallback = nullptr;
 static unsigned int chargeEvalTick = 0;
 
@@ -97,21 +95,11 @@ void onWake(TrackerSleepContext context) {
 }
 
 float get_temperature() {
-  if (EdgePlatform::instance().getSensirionType() != EdgePlatform::SensirionType::eSENSE_INVALID) {
-    float temp {};
-    _sts.singleMeasurement(temp);
-    return temp;
-  } else {
-    return _thermistor.getTemperature();
-  }
+  return _thermistor.getTemperature();
 }
 
 int temperature_init(pin_t analogPin, TemperatureCallback eventCallback) {
-  if (EdgePlatform::instance().getSensirionType() != EdgePlatform::SensirionType::eSENSE_INVALID) {
-    CHECK_TRUE(_sts.init(), SYSTEM_ERROR_INTERNAL);
-  } else {
-    CHECK(_thermistor.begin(analogPin, _thermistorConfig));
-  }
+  CHECK(_thermistor.begin(analogPin, _thermistorConfig));
 
   static ConfigObject _serviceObject
   (

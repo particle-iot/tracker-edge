@@ -25,6 +25,3 @@
 [submodule "lib/model_gauge"]
 	path = lib/model_gauge
 	url = https://github.com/particle-iot/model_gauge.git
-[submodule "lib/sensirion"]
-	path = lib/sensirion
-	url = https://github.com/particle-iot/sensirion.git
