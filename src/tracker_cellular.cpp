@@ -16,7 +16,7 @@
 
 #include "tracker_cellular.h"
 
-#if (PLATFORM_ID == PLATFORM_TRACKERM)
+#ifndef ARRAY_SIZE
     #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #endif
 

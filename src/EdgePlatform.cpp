@@ -171,22 +171,6 @@ void EdgePlatform::init()
     } else {
         sensirion_ = EdgePlatform::SensirionType::eSENSE_INVALID;
     }
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    // Tracker-M is fixed with these peripherals
-    model_ = EdgePlatform::TrackerModel::eTRACKER_M;
-    gnss_ = EdgePlatform::GnssVariant::eLC29HBA;
-
-    switch (byte2 & IMU_MASK) {
-    case IMU_BMI160:
-        imu_ = EdgePlatform::ImuVariant::eBMI160;
-        break;
-    case IMU_BMI270:
-        imu_ = EdgePlatform::ImuVariant::eBMI270;
-        break;
-    }
-
-    fg_ = EdgePlatform::FuelGaugeType::eMAX17043;
-    sensirion_ = EdgePlatform::SensirionType::eSTS31;
 #endif
 
     // Flag the initialization as complete

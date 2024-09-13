@@ -81,7 +81,6 @@ private:
         {
             data &= 0xF9;
             data |= (static_cast<uint8_t>(timer) << 1) & 0x06;
-#if (PLATFORM_ID != PLATFORM_TRACKERM)
             WITH_LOCK(Wire1)
             {
                 WireTransmission config(PMIC_ADDRESS);
@@ -91,7 +90,6 @@ private:
                 Wire1.write(data);
                 Wire1.endTransmission();
             }
-#endif
             //readbackData = pmic.readChargeTermRegister();
         }
         else

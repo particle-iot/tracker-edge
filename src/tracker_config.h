@@ -22,7 +22,7 @@
 // Tracker platform
 //-----------------------------------------------------------------------------
 
-#if ( (PLATFORM_ID != PLATFORM_TRACKER) && (PLATFORM_ID != PLATFORM_TRACKERM) )
+#if ( (PLATFORM_ID != PLATFORM_TRACKER) )
 #error "Platform not supported"
 #endif
 
@@ -34,7 +34,6 @@
 #define TRACKER_MODEL_EVAL                    (0x0001)
 #define TRACKER_MODEL_TRACKERONE              (0x0002)
 #define TRACKER_MODEL_MONITORONE              (0x0003)
-#define TRACKER_MODEL_TRACKERM                (0x0004)
 
 
 //
@@ -62,10 +61,6 @@
     #define BMI_SPI_INTERFACE                 (SPI1)
     #define BMI_SPI_CS_PIN                    (SEN_CS)
     #define BMI_INT_PIN                       (SEN_INT)
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define BMI_SPI_INTERFACE                 (SPI)
-    #define BMI_SPI_CS_PIN                    (Y3)
-    #define BMI_INT_PIN                       (IO_EXP_B0)
 #endif
 #define BMI_INT_MODE                          (FALLING)
 
@@ -75,11 +70,6 @@
     #define UBLOX_PWR_EN_PIN                  (GPS_PWR)
     #define UBLOX_RESETN_PIN                  (GPS_RST)
     #define UBLOX_TX_READY_MCU_PIN            (GPS_INT)
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define UBLOX_CS_PIN                      (PIN_INVALID)
-    #define UBLOX_PWR_EN_PIN                  (GNSS_PWR_EN)
-    #define UBLOX_RESETN_PIN                  (GNSS_RST)
-    #define UBLOX_TX_READY_MCU_PIN            (PIN_INVALID)
 #endif
 #define UBLOX_TX_READY_GPS_PIN                (14) // PIO 14 is EXTINT on GPS Module
 
@@ -87,10 +77,6 @@
     #define QUECTEL_GNSS_I2C_INTERFACE        (Wire1)
     #define QUECTEL_GNSS_PWR_EN_PIN           (GPS_PWR)
     #define QUECTEL_GNSS_WAKEUP_PIN           (GPS_RST)
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define QUECTEL_GNSS_I2C_INTERFACE        (Wire)
-    #define QUECTEL_GNSS_PWR_EN_PIN           (GNSS_PWR_EN)
-    #define QUECTEL_GNSS_WAKEUP_PIN           (GNSS_RST)
 #endif
 
 #define ESP32_SPI_INTERFACE                   (SPI1)
@@ -108,13 +94,6 @@
     #define MCP_CAN_CS_PIN                    (CAN_CS)
     #define MCP_CAN_INT_PIN                   (CAN_INT)
     #define MCP_CAN_STBY_PIN                  (CAN_STBY)
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define MCP_CAN_SPI_INTERFACE             (SPI)
-    #define MCP_CAN_PWR_EN_PIN                (A0)
-    #define MCP_CAN_RESETN_PIN                (IO_EXP_B2)
-    #define MCP_CAN_CS_PIN                    (Y4)
-    #define MCP_CAN_INT_PIN                   (IO_EXP_B1)
-    #define MCP_CAN_STBY_PIN                  (IO_EXP_B3)
 #endif
 
 
@@ -125,14 +104,10 @@
 #define TRACKER_USER_BUTTON                   (D1)
 #if (PLATFORM_ID == PLATFORM_TRACKER)
     #define TRACKER_GNSS_LOCK_LED             (D2)
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define TRACKER_GNSS_LOCK_LED             (PIN_INVALID)
 #endif
 
 #if (PLATFORM_ID == PLATFORM_TRACKER)
     //#define RTC_WDT_DISABLE // Optional define for Tracker
-#elif (PLATFORM_ID == PLATFORM_TRACKERM)
-    #define RTC_WDT_DISABLE   // Always needs to be disabled for Tracker-M
 #endif
 #define TRACKER_89503_THERMISTOR              (A3)
 #define TRACKER_89503_USER_BUTTON             (D2)
