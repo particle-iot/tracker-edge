@@ -102,8 +102,10 @@ public:
     /**
      * @brief Read OTP region for hardware information
      *
+     * @param model Model info from non-volatile memory
+     * @param variant Variant info from non-volatile memory
      */
-    void init();
+    void init(uint32_t model, uint32_t variant);
 
     /**
      * @brief Return Tracker model type

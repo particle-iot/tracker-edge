@@ -568,12 +568,10 @@ int Tracker::init()
     _model = TRACKER_MODEL_NUMBER;
 #ifdef TRACKER_MODEL_VARIANT
     _variant = TRACKER_MODEL_VARIANT;
-#else
-    _variant = 0;
 #endif // TRACKER_MODEL_VARIANT
 #endif // TRACKER_MODEL_NUMBER
 
-    EdgePlatform::instance().init();
+    EdgePlatform::instance().init(_model, _variant);
     switch (EdgePlatform::instance().getModel()) {
         case EdgePlatform::TrackerModel::eTRACKER_ONE:
             _platformConfig = new TrackerOneConfiguration();

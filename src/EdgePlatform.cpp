@@ -64,8 +64,9 @@ EdgePlatform *EdgePlatform::_instance = nullptr;
 
 Logger EdgePlatformLogger("otp");
 
-void EdgePlatform::init()
+void EdgePlatform::init(uint32_t model, uint32_t variant)
 {
+#ifdef TRACKER_HAS_HW_INFO
     hal_device_hw_info info;
     uint32_t           res;
 
@@ -77,8 +78,13 @@ void EdgePlatform::init()
     uint8_t byte2 = info.features & 0xFF;
     uint8_t byte3 = info.features >> 8;
 
+#else // TRACKER_HAS_HW_INFO
+    uint8_t byte2 = 0xFF;
+    uint8_t byte3 = 0xFF;
+#endif // TRACKER_HAS_HW_INFO
+
     // Parse OTP area to determine module type
-    switch (info.model) {
+    switch (model) {
     case TRACKER_MODEL_BARE_SOM:
         model_ = TrackerModel::eBARE_SOM;
         break;
