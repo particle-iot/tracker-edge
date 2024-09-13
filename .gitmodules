@@ -22,12 +22,6 @@
 [submodule "lib/disk-queue"]
 	path = lib/disk-queue
 	url = https://github.com/particle-iot/disk-queue.git
-[submodule "lib/particle-adp8866"]
-	path = lib/particle-adp8866
-	url = https://github.com/particle-iot/particle-adp8866.git
-[submodule "lib/particle-led"]
-	path = lib/particle-led
-	url = https://github.com/particle-iot/particle-led.git
 [submodule "lib/model_gauge"]
 	path = lib/model_gauge
 	url = https://github.com/particle-iot/model_gauge.git
