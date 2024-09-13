@@ -89,9 +89,6 @@ void EdgePlatform::init()
     case TRACKER_MODEL_TRACKERONE:
         model_ = TrackerModel::eTRACKER_ONE;
         break;
-    case TRACKER_MODEL_MONITORONE:
-        model_ = TrackerModel::eMONITOR_ONE;
-        break;
     case TRACKER_MODEL_BARE_SOM_DEFAULT:
     default:
         model_ = TrackerModel::eBARE_SOM_DEFAULT;
@@ -166,11 +163,7 @@ void EdgePlatform::init()
     }
 
     // Sensirion sensor type is currently not a field in OTP. However, there may be a field in the future.
-    if( TRACKER_MODEL_MONITORONE == info.model ) {
-        sensirion_ = EdgePlatform::SensirionType::eSTS31;
-    } else {
-        sensirion_ = EdgePlatform::SensirionType::eSENSE_INVALID;
-    }
+    sensirion_ = EdgePlatform::SensirionType::eSENSE_INVALID;
 #endif
 
     // Flag the initialization as complete

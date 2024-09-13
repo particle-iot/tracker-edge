@@ -31,7 +31,6 @@ public:
         eBARE_SOM,
         eEVAL,
         eTRACKER_ONE,
-        eMONITOR_ONE,
         eMODEL_INVALID
     };
 

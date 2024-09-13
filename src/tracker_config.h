@@ -33,7 +33,6 @@
 #define TRACKER_MODEL_BARE_SOM                (0x0000)
 #define TRACKER_MODEL_EVAL                    (0x0001)
 #define TRACKER_MODEL_TRACKERONE              (0x0002)
-#define TRACKER_MODEL_MONITORONE              (0x0003)
 
 
 //

@@ -19,7 +19,6 @@
 #include "tracker.h"
 #include "tracker_cellular.h"
 #include "mcp_can.h"
-#include "MonitorOneConfiguration.h"
 #include "LocationPublish.h"
 #include "tracker_fuelgauge.h"
 #include "TrackerOneConfiguration.h"
@@ -469,7 +468,7 @@ void Tracker::onSleepPrepare(TrackerSleepContext context)
         case TRACKER_MODEL_TRACKERONE:
         case TRACKER_MODEL_EVAL:
         // Fall through
-        case TRACKER_MODEL_MONITORONE: {
+        {
             TrackerSleep::instance().wakeAtSeconds(System.uptime() + _commonCfgData.lowBatterySleepWakeInterval);
         }
         break;
@@ -479,8 +478,7 @@ void Tracker::onSleepPrepare(TrackerSleepContext context)
 void Tracker::onSleep(TrackerSleepContext context)
 {
     switch (_model) {
-        case TRACKER_MODEL_TRACKERONE:
-        case TRACKER_MODEL_MONITORONE: {
+        case TRACKER_MODEL_TRACKERONE: {
             GnssLedEnable(false);
         }
         break;
@@ -490,8 +488,7 @@ void Tracker::onSleep(TrackerSleepContext context)
 void Tracker::onWake(TrackerSleepContext context)
 {
     switch (_model) {
-        case TRACKER_MODEL_TRACKERONE:
-        case TRACKER_MODEL_MONITORONE: {
+        case TRACKER_MODEL_TRACKERONE: {
             GnssLedEnable(true);
             // Ensure battery evaluation starts immediately after waking
             _evalTick = 0;
@@ -579,11 +576,6 @@ int Tracker::init()
 
     EdgePlatform::instance().init();
     switch (EdgePlatform::instance().getModel()) {
-        case EdgePlatform::TrackerModel::eMONITOR_ONE:
-            _platformConfig = new MonitorOneConfiguration();
-            _commonCfgData = _platformConfig->get_common_config_data();
-            monitorOneUserFunction();
-            break;
         case EdgePlatform::TrackerModel::eTRACKER_ONE:
             _platformConfig = new TrackerOneConfiguration();
             _commonCfgData = _platformConfig->get_common_config_data();
@@ -637,12 +629,6 @@ int Tracker::init()
     switch (_model) {
         case TRACKER_MODEL_TRACKERONE: {
             temperature_init(TRACKER_THERMISTOR,
-                [this](TemperatureChargeEvent event){ return chargeCallback(event); }
-            );
-        }
-        break;
-        case TRACKER_MODEL_MONITORONE: {
-            temperature_init(TRACKER_89503_THERMISTOR,
                 [this](TemperatureChargeEvent event){ return chargeCallback(event); }
             );
         }
@@ -713,9 +699,7 @@ void Tracker::loop()
 
     // Evaluate low battery conditions
     switch (_model) {
-        case TRACKER_MODEL_TRACKERONE:
-        // Fall through
-        case TRACKER_MODEL_MONITORONE:{
+        case TRACKER_MODEL_TRACKERONE: {
             evaluateBatteryCharge();
         }
         // Fall through
@@ -729,9 +713,7 @@ void Tracker::loop()
 
     // Check for temperature enabled hardware
     switch (_model) {
-        case TRACKER_MODEL_TRACKERONE:
-        // Fall through
-        case TRACKER_MODEL_MONITORONE: {
+        case TRACKER_MODEL_TRACKERONE: {
             temperature_tick();
 
             if (temperature_high_events())
@@ -751,7 +733,7 @@ void Tracker::loop()
     // fast operations for every loop
     cloudService.tick();
     configService.tick();
- #ifdef TRACKER_USE_MEMFAULT
+#ifdef TRACKER_USE_MEMFAULT
     if (_deviceMonitoring && (nullptr != _memfault)) {
         _memfault->process();
     }
@@ -900,9 +882,7 @@ void Tracker::loc_gen_cb(JSONWriter& writer, LocationPoint &loc, const void *con
 
     // Check for Tracker One hardware
     switch (Tracker::instance().getModel()) {
-        case TRACKER_MODEL_TRACKERONE:
-        // Fall through
-        case TRACKER_MODEL_MONITORONE: {
+        case TRACKER_MODEL_TRACKERONE: {
             writer.name("temp").value(get_temperature(), 1);
         }
         break;
