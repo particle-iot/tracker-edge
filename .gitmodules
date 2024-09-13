@@ -34,6 +34,3 @@
 [submodule "lib/sensirion"]
 	path = lib/sensirion
 	url = https://github.com/particle-iot/sensirion.git
-[submodule "lib/debounce-switch"]
-	path = lib/debounce-switch
-	url = https://github.com/rickkas7/DebounceSwitchRK.git
