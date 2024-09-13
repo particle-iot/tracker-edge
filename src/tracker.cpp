@@ -171,7 +171,6 @@ void Tracker::enableIoCanPower(bool enable)
 int Tracker::initEsp32()
 {
     // ESP32 related GPIO
-#if (PLATFORM_ID == PLATFORM_TRACKER)
     pinMode(ESP32_BOOT_MODE_PIN, OUTPUT);
     digitalWrite(ESP32_BOOT_MODE_PIN, HIGH);
     pinMode(ESP32_PWR_EN_PIN, OUTPUT);
@@ -182,7 +181,7 @@ int Tracker::initEsp32()
     digitalWrite(ESP32_PWR_EN_PIN, LOW); // power off device
     pinMode(ESP32_CS_PIN, OUTPUT);
     digitalWrite(ESP32_CS_PIN, HIGH);
-#endif
+
     return SYSTEM_ERROR_NONE;
 }
 

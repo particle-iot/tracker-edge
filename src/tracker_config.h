@@ -22,7 +22,7 @@
 // Tracker platform
 //-----------------------------------------------------------------------------
 
-#if ( (PLATFORM_ID != PLATFORM_TRACKER) )
+#if (PLATFORM_ID != PLATFORM_TRACKER)
 #error "Platform not supported"
 #endif
 
@@ -56,44 +56,30 @@
 //
 // Pin and interface mapping
 //
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    #define BMI_SPI_INTERFACE                 (SPI1)
-    #define BMI_SPI_CS_PIN                    (SEN_CS)
-    #define BMI_INT_PIN                       (SEN_INT)
-#endif
+#define BMI_SPI_INTERFACE                     (SPI1)
+#define BMI_SPI_CS_PIN                        (SEN_CS)
+#define BMI_INT_PIN                           (SEN_INT)
 #define BMI_INT_MODE                          (FALLING)
 
 #define UBLOX_SPI_INTERFACE                   (SPI1)
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    #define UBLOX_CS_PIN                      (GPS_CS)
-    #define UBLOX_PWR_EN_PIN                  (GPS_PWR)
-    #define UBLOX_RESETN_PIN                  (GPS_RST)
-    #define UBLOX_TX_READY_MCU_PIN            (GPS_INT)
-#endif
+#define UBLOX_CS_PIN                          (GPS_CS)
+#define UBLOX_PWR_EN_PIN                      (GPS_PWR)
+#define UBLOX_RESETN_PIN                      (GPS_RST)
+#define UBLOX_TX_READY_MCU_PIN                (GPS_INT)
 #define UBLOX_TX_READY_GPS_PIN                (14) // PIO 14 is EXTINT on GPS Module
 
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    #define QUECTEL_GNSS_I2C_INTERFACE        (Wire1)
-    #define QUECTEL_GNSS_PWR_EN_PIN           (GPS_PWR)
-    #define QUECTEL_GNSS_WAKEUP_PIN           (GPS_RST)
-#endif
-
 #define ESP32_SPI_INTERFACE                   (SPI1)
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    #define ESP32_CS_PIN                      (WIFI_CS)
-    #define ESP32_BOOT_MODE_PIN               (WIFI_BOOT)
-    #define ESP32_PWR_EN_PIN                  (WIFI_EN)
-    #define ESP32_INT_PIN                     (WIFI_INT)
-#endif
+#define ESP32_CS_PIN                          (WIFI_CS)
+#define ESP32_BOOT_MODE_PIN                   (WIFI_BOOT)
+#define ESP32_PWR_EN_PIN                      (WIFI_EN)
+#define ESP32_INT_PIN                         (WIFI_INT)
 
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    #define MCP_CAN_SPI_INTERFACE             (SPI1)
-    #define MCP_CAN_PWR_EN_PIN                (CAN_PWR)
-    #define MCP_CAN_RESETN_PIN                (CAN_RST)
-    #define MCP_CAN_CS_PIN                    (CAN_CS)
-    #define MCP_CAN_INT_PIN                   (CAN_INT)
-    #define MCP_CAN_STBY_PIN                  (CAN_STBY)
-#endif
+#define MCP_CAN_SPI_INTERFACE                 (SPI1)
+#define MCP_CAN_PWR_EN_PIN                    (CAN_PWR)
+#define MCP_CAN_RESETN_PIN                    (CAN_RST)
+#define MCP_CAN_CS_PIN                        (CAN_CS)
+#define MCP_CAN_INT_PIN                       (CAN_INT)
+#define MCP_CAN_STBY_PIN                      (CAN_STBY)
 
 
 //
@@ -101,22 +87,6 @@
 //
 #define TRACKER_THERMISTOR                    (A0)
 #define TRACKER_USER_BUTTON                   (D1)
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    #define TRACKER_GNSS_LOCK_LED             (D2)
-#endif
+#define TRACKER_GNSS_LOCK_LED                 (D2)
 
-#if (PLATFORM_ID == PLATFORM_TRACKER)
-    //#define RTC_WDT_DISABLE // Optional define for Tracker
-#endif
-#define TRACKER_89503_THERMISTOR              (A3)
-#define TRACKER_89503_USER_BUTTON             (D2)
-#define TRACKER_89503_VIN_EN_PIN              (NFC_PIN2)
-
-#define TRACKER_89503_STS3X_I2C_INSTANCE      (Wire)
-#define TRACKER_89503_STS3X_I2C_ADDR          (0x4a)
-
-#define TRACKER_89503_ADP8866_I2C_INSTANCE    (Wire)
-#define TRACKER_89503_ADP8866_I2C_ADDR        (0x27)
-#define TRACKER_89503_ADP8866_RESETN_PIN      (NFC_PIN1)
-
-//#define RTC_WDT_DISABLE
+//#define RTC_WDT_DISABLE // Optional define for Tracker

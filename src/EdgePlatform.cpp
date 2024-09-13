@@ -77,7 +77,6 @@ void EdgePlatform::init()
     uint8_t byte2 = info.features & 0xFF;
     uint8_t byte3 = info.features >> 8;
 
-#if (PLATFORM_ID == PLATFORM_TRACKER)
     // Parse OTP area to determine module type
     switch (info.model) {
     case TRACKER_MODEL_BARE_SOM:
@@ -152,8 +151,6 @@ void EdgePlatform::init()
     } else {
         currentLimit_ = Ilim::eILIM_3;
     }
-
-#endif
 
     // Flag the initialization as complete
     isInitialized_ = true;
