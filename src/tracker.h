@@ -314,11 +314,18 @@ class Tracker {
         int stop();
 
         /**
-         * @brief Prepare tracker IO and peripherals for shutdown
+         * @brief Prepare tracker IO and peripherals for low power
          *
          * @retval SYSTEM_ERROR_NONE
          */
         int end();
+
+        /**
+         * @brief Prepare tracker IO and peripherals for shutdown
+         *
+         * @retval SYSTEM_ERROR_NONE
+         */
+        int shutdown();
 
         /**
          * @brief Prepare tracker for reset and issue
@@ -387,6 +394,12 @@ class Tracker {
          * @param enable Enable IO/CAN power when true
          */
         void enableIoCanPower(bool enable);
+
+        /**
+         * @brief Force the GNSS module into low power state
+         *
+         */
+        void forceShutdownGnss();
 
         /**
          * @brief Indicates whether device can accept commands through USB interface

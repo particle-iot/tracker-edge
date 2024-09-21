@@ -168,6 +168,15 @@ void Tracker::enableIoCanPower(bool enable)
     digitalWrite(MCP_CAN_PWR_EN_PIN, (_canPowerEnabled = enable) ? HIGH : LOW);
 }
 
+void Tracker::forceShutdownGnss()
+{
+    // Forceably shutdown the GNSS module
+    digitalWrite(UBLOX_RESETN_PIN, LOW);
+    delay(100);
+    digitalWrite(UBLOX_RESETN_PIN, HIGH);
+    digitalWrite(UBLOX_PWR_EN_PIN, LOW);
+}
+
 int Tracker::initEsp32()
 {
     // ESP32 related GPIO
@@ -640,7 +649,7 @@ int Tracker::init()
 
     shipping.init();
     shipping.regShutdownBeginCallback(std::bind(&Tracker::stop, this));
-    shipping.regShutdownIoCallback(std::bind(&Tracker::end, this));
+    shipping.regShutdownIoCallback(std::bind(&Tracker::shutdown, this));
     shipping.regShutdownFinalCallback(
         [this](){
             enableWatchdog(false);
@@ -749,6 +758,12 @@ int Tracker::end() {
     enableIoCanPower(false);
     GnssLedEnable(false);
     enableWatchdog(false);
+    return SYSTEM_ERROR_NONE;
+}
+
+int Tracker::shutdown() {
+    end();
+    forceShutdownGnss();
     return SYSTEM_ERROR_NONE;
 }
 
