@@ -1,3 +1,30 @@
+## v19
+
+### COMPATIBILTY
+
+Must be built using device OS v3.2.0 or greater.
+
+### FEATURES
+
+- Added satellite diagnostics configuration to publish satellite count and mean CN0.
+- Updated battery model for more accurate state-of-charge
+
+### ENHANCEMENTS
+
+- Source can be built for device OS 3.2.0 to 6.x.
+
+### BUGFIXES
+
+- Fixed thermistor characteristics for more accuracy.
+- Fixed excessive shutdown current for GNSS ephemeris battery during shipping mode.
+- Fixed Ublox M8U fix stability stability check to exclude bad acquistions.
+
+### OTHER CHANGES
+
+- Some function and file cleanup to allow for abstraction and organization of source code.
+- Use of C++ templates to replace selected function pointer callbacks.
+
+
 ## v18
 
 ### COMPATIBILTY
