@@ -6,7 +6,7 @@ jobs:
   compile:
     strategy:
       matrix:
-        device-os-version: [ '4.x', '5.x' ]
+        device-os-version: [ '3.x', '4.x', '5.x' ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
