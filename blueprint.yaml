@@ -1,21 +1,31 @@
 id: particle/tracker-edge
-category: solution
-icon: particle.png
+slug: particle-tracker-edge
+type: solution
+category: "Reference applications"
+expertiseLevel: ""
+tags: ["tracker"]
+icon: assets/particle-logo.svg
 gitrepo: https://github.com/particle-iot/tracker-edge
 name: "Tracker Edge"
 shortDescription: "A complete reference asset tracking solution"
 version: 1.19.0
 models: []
 language: [ "C++" ]
-cloudServices: [ "Integrations", "Logic", "Ledger", "Lake" ]
+cloudServices:
+  - name: Integrations
+  - name: Logic
+  - name: Ledger
+  - name: Lake
 integrations: [ ]
-hardwareDependencies:
+supportedDevices:
   - name: Tracker One
     link: https://www.particle.io/tracker-one/
-    tags: [ "Tracker One" ]
-  - name: Particle T-SoM Module
+  - name: T-SoM
     link: https://www.particle.io/tracker-som/
-    tags: [ "T-SoM" ]
+hardwareDependencies:
+  - name: 1x Supported device
+introduction: |
+  Application reference firmware for the Particle Tracker.
 description: |
   A comprehensive asset tracking solution that includes location services, various power modes, and extensive configuration capabilities. 
 
@@ -27,3 +37,5 @@ description: |
   - Cloud Configuration: Includes cloud-configurable settings for various aspects like GNSS dead reckoning, power settings, and publish rates.
   - Tracking in Extreme Conditions: Accurate tracking in poor conditions, sleep modes to conserve power, and configurable publish rates based on movement or location triggers.
   - Device Health and Diagnostics: Built-in support for the Memfault platform for advanced device monitoring and diagnostics, as well as detailed event logging.
+
+additionalResources:
