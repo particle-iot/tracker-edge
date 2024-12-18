@@ -1,9 +1,9 @@
 slug: particle-tracker-edge
-type: solution
+type: Solution
 category: "Reference applications"
-expertiseLevel: "intermediate"
-tags: ["monitor-edge", "tracker", "sensors", "industrial"]
-icon: assets/particle-logo.svg
+expertiseLevel: "Intermediate"
+tags: ["Monitor-edge", "Tracker", "Sensors", "Industrial"]
+icon: assets/tracker-edge.svg
 gitrepo: https://github.com/particle-iot/tracker-edge
 name: "Tracker Edge"
 shortDescription: "A complete reference asset tracking solution"
