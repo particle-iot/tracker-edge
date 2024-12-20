@@ -24,7 +24,10 @@ supportedDevices:
 hardwareDependencies:
   - name: 1x Supported device
 introduction: |
-  Application reference firmware for the Particle Tracker.
+  Tracker Edge is a flexible firmware solution that can be easily reconfigured for various use cases.
+  
+  It integrates with Particle's Tracking System for automatic location updates and is open-source, allowing for customization to meet specific needs. It can be used off-the-shelf, semi-customized with added sensors and behavior modifications, or fully customized modifying the code.
+
 description: |
   A comprehensive asset tracking solution that includes location services, various power modes, and extensive configuration capabilities. 
 
