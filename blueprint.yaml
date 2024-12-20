@@ -22,7 +22,7 @@ supportedDevices:
   - name: T-SoM
     link: https://www.particle.io/tracker-som/
 hardwareDependencies:
-  - name: 1x Supported device
+  - name: Supported device
 introduction: |
   Tracker Edge is a flexible firmware solution that can be easily reconfigured for various use cases.
   
