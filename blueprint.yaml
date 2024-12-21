@@ -6,7 +6,7 @@ tags: ["Tracker One", "Sensors", "Industrial"]
 icon: assets/tracker-edge.svg
 gitrepo: https://github.com/particle-iot/tracker-edge
 name: "Tracker Edge"
-shortDescription: "A complete reference asset tracking solution"
+shortDescription: "A complete reference asset tracking solution."
 version: 1.19.0
 models: []
 language: [ "C++" ]
