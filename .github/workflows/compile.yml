@@ -6,11 +6,11 @@ jobs:
   compile:
     strategy:
       matrix:
-        device-os-version: [ '3.x', '4.x', '5.x' ]
+        device-os-version: [ '3.x', '4.x', '5.x', '6.x' ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
 
@@ -22,7 +22,7 @@ jobs:
           device-os-version: '${{ matrix.device-os-version }}'
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tracker-artifacts-${{ matrix.device-os-version }}
           path: |
