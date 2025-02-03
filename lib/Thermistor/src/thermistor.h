@@ -21,6 +21,12 @@
 
 namespace particle {
 
+#if ( SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 2, 0) )
+#define PIN_VALIDATE hal_pin_validate_function
+#else
+#define PIN_VALIDATE HAL_Validate_Pin_Function
+#endif // SYSTEM_VERSION
+
 /**
  * @brief Resistor divider circuit used for thermistor.
  *
@@ -114,7 +120,7 @@ public:
     CHECK_TRUE((checkPin < FIRST_ANALOG_PIN + TOTAL_ANALOG_PINS), SYSTEM_ERROR_INVALID_ARGUMENT);
     checkPin += FIRST_ANALOG_PIN;
     CHECK_TRUE(pinAvailable(checkPin), SYSTEM_ERROR_ALREADY_EXISTS);
-    CHECK_TRUE((HAL_Validate_Pin_Function(checkPin, PF_ADC) == PF_ADC), SYSTEM_ERROR_IO);
+    CHECK_TRUE((PIN_VALIDATE(checkPin, PF_ADC) == PF_ADC), SYSTEM_ERROR_IO);
 
     // Various configuration checks
     CHECK_TRUE((config.adcResolution > 1.0), SYSTEM_ERROR_INVALID_ARGUMENT);
