@@ -1,3 +1,25 @@
+## v20
+
+### COMPATIBILTY
+
+Must be built using device OS v3.2.0 or greater.
+
+### FEATURES
+
+- Fix API complication for Device OS 6.2.0 and above
+
+### ENHANCEMENTS
+
+- Source can be built for device OS >= 6.2.0 
+
+### BUGFIXES
+
+- None
+
+### OTHER CHANGES
+
+- API update
+
 ## v19
 
 ### COMPATIBILTY
