@@ -104,10 +104,30 @@ void Tracker::collectMemfaultHeartbeatMetrics() {
 }
 #endif // TRACKER_USE_MEMFAULT
 
+#if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
+int getRtcCalibration(int32_t &value, const void *context)
+{
+    value = ExternalTime.status().xtalCalibration();
+
+    return 0;
+}
+
+int setRtcCalibration(int32_t value, const void *context)
+{
+    // TODO: Not supported for now, but dummy required to not trigger load
+    // failure and republish of config module on every boot.
+
+    return 0;
+}
+#endif
+
 int Tracker::registerConfig()
 {
     static ConfigObject tracker_config("tracker", {
         ConfigBool("usb_cmd", &_cloudConfig.UsbCommandEnable),
+#if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
+        ConfigInt("rtc_cal", getRtcCalibration, setRtcCalibration),
+#endif
     });
     configService.registerModule(tracker_config);
 

@@ -5,6 +5,7 @@ Must be built using device OS v3.2.0 or greater.
 ### FEATURES
 
 - Update deprecated Watchdog APIs for Device OS 6.4.0 and above.
+- Expose read-only AM1805 RTC fine calibration.
 
 ### ENHANCEMENTS
 
