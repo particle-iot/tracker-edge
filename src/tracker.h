@@ -419,6 +419,13 @@ class Tracker {
         void enableWatchdog(bool enable);
 
         /**
+         * @brief Feed the application watchdog.
+         *
+         * @param enable
+         */
+        void feedWatchdog();
+
+        /**
          * @brief Invoke shipping mode
          *
          */

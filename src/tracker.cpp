@@ -104,10 +104,30 @@ void Tracker::collectMemfaultHeartbeatMetrics() {
 }
 #endif // TRACKER_USE_MEMFAULT
 
+#if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
+int getRtcCalibration(int32_t &value, const void *context)
+{
+    value = ExternalTime.status().xtalCalibration();
+
+    return 0;
+}
+
+int setRtcCalibration(int32_t value, const void *context)
+{
+    // TODO: Not supported for now, but dummy required to not trigger load
+    // failure and republish of config module on every boot.
+
+    return 0;
+}
+#endif
+
 int Tracker::registerConfig()
 {
     static ConfigObject tracker_config("tracker", {
         ConfigBool("usb_cmd", &_cloudConfig.UsbCommandEnable),
+#if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
+        ConfigInt("rtc_cal", getRtcCalibration, setRtcCalibration),
+#endif
     });
     configService.registerModule(tracker_config);
 
@@ -240,17 +260,40 @@ int Tracker::initIo()
 
 void Tracker::enableWatchdog(bool enable) {
 #ifndef RTC_WDT_DISABLE
-    if (enable) {
-        // watchdog at 1 minute
-        hal_exrtc_enable_watchdog(_commonCfgData.watchdogExpireTime, nullptr);
-        hal_exrtc_feed_watchdog(nullptr);
-    }
-    else {
-        hal_exrtc_disable_watchdog(nullptr);
-    }
+    #if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
+        if (enable) {
+            Watchdog.init(WatchdogConfiguration().timeout(_commonCfgData.watchdogExpireTime));
+            if (!Watchdog.started()) {
+                Watchdog.start();
+            }
+        }
+        else {
+            if (Watchdog.started()) {
+                Watchdog.stop();
+            }
+        }
+    #else
+        if (enable) {
+            hal_exrtc_enable_watchdog(_commonCfgData.watchdogExpireTime, nullptr);
+            feedWatchdog();
+        }
+        else {
+            hal_exrtc_disable_watchdog(nullptr);
+        }
+    #endif
 #else
     (void)enable;
 #endif // RTC_WDT_DISABLE
+}
+
+void Tracker::feedWatchdog() {
+#ifndef RTC_WDT_DISABLE
+    #if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
+        Watchdog.refresh();
+    #else
+        hal_exrtc_feed_watchdog(nullptr);
+    #endif
+#endif
 }
 
 void Tracker::startShippingMode() {
@@ -696,9 +739,7 @@ void Tracker::loop()
     {
         _lastLoopSec = cur_sec;
 
-#ifndef RTC_WDT_DISABLE
-        hal_exrtc_feed_watchdog(nullptr);
-#endif
+        feedWatchdog();
     }
 
     TrackerFuelGauge::instance().loop();
