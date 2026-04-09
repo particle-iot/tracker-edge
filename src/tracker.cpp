@@ -30,7 +30,7 @@ void ctrl_request_custom_handler(ctrl_request* req)
     if (Tracker::instance().isUsbCommandEnabled())
     {
         String command(req->request_data, req->request_size);
-        if (CloudService::instance().dispatchCommand(command))
+        if (CloudService::instance().dispatchCommand(command) == 0)
         {
             result = SYSTEM_ERROR_NONE;
         }
