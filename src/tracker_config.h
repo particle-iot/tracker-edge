@@ -46,7 +46,7 @@
 #endif
 
 #ifndef TRACKER_PRODUCT_VERSION
-#define TRACKER_PRODUCT_VERSION               (21)
+#define TRACKER_PRODUCT_VERSION               (22)
 #endif
 
 #if ( SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(4, 0, 0) )
