@@ -262,14 +262,14 @@ void Tracker::enableWatchdog(bool enable) {
 #ifndef RTC_WDT_DISABLE
     #if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
         if (enable) {
-            Watchdog.init(WatchdogConfiguration().timeout(_commonCfgData.watchdogExpireTime));
-            if (!Watchdog.started()) {
-                Watchdog.start();
+            ExternalWatchdog.init(WatchdogConfiguration().timeout(_commonCfgData.watchdogExpireTime));
+            if (!ExternalWatchdog.started()) {
+                ExternalWatchdog.start();
             }
         }
         else {
-            if (Watchdog.started()) {
-                Watchdog.stop();
+            if (ExternalWatchdog.started()) {
+                ExternalWatchdog.stop();
             }
         }
     #else
@@ -289,7 +289,7 @@ void Tracker::enableWatchdog(bool enable) {
 void Tracker::feedWatchdog() {
 #ifndef RTC_WDT_DISABLE
     #if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 4, 0)
-        Watchdog.refresh();
+        ExternalWatchdog.refresh();
     #else
         hal_exrtc_feed_watchdog(nullptr);
     #endif
