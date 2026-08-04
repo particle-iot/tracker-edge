@@ -30,7 +30,28 @@ STARTUP(
     Tracker::startup();
 );
 
-SerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
+/*
+ * Workaround for a Device OS 6.5.0 USB CDC panic (SOS 10, "panic, assert_failed").
+ * Revert to pre-6.5.0 behavior.
+ */
+class ThrottledSerialLogHandler: public SerialLogHandler {
+public:
+    explicit ThrottledSerialLogHandler(LogLevel level = LOG_LEVEL_INFO, LogCategoryFilters filters = {}) :
+            SerialLogHandler(level, filters) {
+    }
+
+    explicit ThrottledSerialLogHandler(int baud, LogLevel level = LOG_LEVEL_INFO, LogCategoryFilters filters = {}) :
+            SerialLogHandler(baud, level, filters) {
+    }
+
+    virtual void write(const char *data, size_t size) override {
+        for (size_t i = 0; i < size; i++) {
+            Serial.write((uint8_t)data[i]);
+        }
+    }
+};
+
+ThrottledSerialLogHandler logHandler(115200, LOG_LEVEL_TRACE, {
     { "app.gps.nmea", LOG_LEVEL_INFO },
     { "app.gps.ubx",  LOG_LEVEL_INFO },
     { "ncp.at", LOG_LEVEL_INFO },

@@ -1,3 +1,22 @@
+## v23
+
+### COMPATIBILTY
+
+Must be built using device OS v3.2.0 or greater.
+
+### FEATURES
+
+- Support for the `PARTICLE_PMIC_INPUT_CURRENT` and `PARTICLE_PMIC_CHARGE_CURRENT` environment variables on device OS 6.5.0 and above, which override the PMIC input current limit and battery charge current.  See official Particle documentation for example usage.
+
+### ENHANCEMENTS
+
+- Log the PMIC configuration applied by the system power manager, along with any environment variable overrides.
+
+### BUGFIXES
+
+- Correctly select the external watchdog on device OS 6.4.0 and above, resolving premature wake from sleep when using the internal watchdog.
+- Work around a device OS 6.5.0 panic (SOS 10, assertion failure) that could reset the device when serial logging filled the USB CDC transmit buffer.
+
 ## v22
 
 ### COMPATIBILTY

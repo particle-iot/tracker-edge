@@ -24,6 +24,9 @@
 #include "TrackerOneConfiguration.h"
 #include "TrackerEvalConfiguration.h"
 
+constexpr system_tick_t TrackerPowerConfigLogDelayMs = 10000;
+constexpr unsigned TrackerPowerConfigLogCount = 3;
+
 void ctrl_request_custom_handler(ctrl_request* req)
 {
     auto result = SYSTEM_ERROR_NOT_SUPPORTED;
@@ -725,6 +728,28 @@ int Tracker::init()
     return SYSTEM_ERROR_NONE;
 }
 
+void Tracker::logPowerConfig(unsigned sample) {
+    // Read back what the power manager actually programmed into the PMIC.
+    {
+        PMIC pmic(true);
+        Log.info("power config [%u/%u]: input current limit %u mA, charge current %u mA, input voltage limit %u mV",
+            sample, TrackerPowerConfigLogCount,
+            (unsigned)pmic.getInputCurrentLimit(),
+            (unsigned)pmic.getChargeCurrentValue(),
+            (unsigned)pmic.getInputVoltageLimit());
+    }
+
+#if SYSTEM_VERSION >= SYSTEM_VERSION_DEFAULT(6, 5, 0)
+    // Requested values, so an override that was rejected as out of range is
+    // distinguishable from one that was applied.
+    int inputCurrent = 0;
+    int chargeCurrent = 0;
+    Log.info("power env: PARTICLE_PMIC_INPUT_CURRENT %s, PARTICLE_PMIC_CHARGE_CURRENT %s",
+        System.getEnv("PARTICLE_PMIC_INPUT_CURRENT", inputCurrent) ? String(inputCurrent).c_str() : "unset",
+        System.getEnv("PARTICLE_PMIC_CHARGE_CURRENT", chargeCurrent) ? String(chargeCurrent).c_str() : "unset");
+#endif
+}
+
 void Tracker::loop()
 {
     if (_platformConfig == nullptr)
@@ -740,6 +765,17 @@ void Tracker::loop()
         _lastLoopSec = cur_sec;
 
         feedWatchdog();
+    }
+
+    // Log the power configuration a few times after init(). Reading it during
+    // init() catches the PMIC before its input source detection has settled.
+    static system_tick_t powerLogAt = millis() + TrackerPowerConfigLogDelayMs;
+    static unsigned powerLogCount = 0;
+    if ((powerLogCount < TrackerPowerConfigLogCount) && (millis() >= powerLogAt))
+    {
+        powerLogCount++;
+        powerLogAt = millis() + TrackerPowerConfigLogDelayMs;
+        logPowerConfig(powerLogCount);
     }
 
     TrackerFuelGauge::instance().loop();
